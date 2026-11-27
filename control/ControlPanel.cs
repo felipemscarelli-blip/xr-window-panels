@@ -20,6 +20,20 @@ using System.Windows.Forms;
 
 namespace XRWindowPanels
 {
+    // ------------------------------------------------------------------ Localization
+    // English UI, Portuguese when Windows is set to Portuguese. XRWP_LANG=en|pt overrides.
+    static class L
+    {
+        public static readonly bool Pt = IsPortuguese();
+        static bool IsPortuguese()
+        {
+            string lang = Environment.GetEnvironmentVariable("XRWP_LANG");
+            if (string.IsNullOrEmpty(lang)) lang = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+            return lang.StartsWith("pt", StringComparison.OrdinalIgnoreCase);
+        }
+        public static string T(string en, string pt) { return Pt ? pt : en; }
+    }
+
     // ------------------------------------------------------------------ Win32
     static class Native
     {
@@ -56,7 +70,7 @@ namespace XRWindowPanels
 
         public override string ToString()
         {
-            string target = Window.Length > 0 ? Window : (Process.Length > 0 ? Process : "(escolha uma janela)");
+            string target = Window.Length > 0 ? Window : (Process.Length > 0 ? Process : L.T("(pick a window)", "(escolha uma janela)"));
             return (Enabled ? "" : "[off] ") + target;
         }
     }
@@ -141,8 +155,8 @@ namespace XRWindowPanels
         public void Save()
         {
             var sb = new StringBuilder();
-            sb.AppendLine("; XR Window Panels - gerado pelo XRWindowPanelsControl.exe");
-            sb.AppendLine("; Atalhos no jogo: Ctrl+F12 mostra/esconde, Ctrl+F11 recentraliza todos.");
+            sb.AppendLine("; XR Window Panels - written by XRWindowPanelsControl.exe");
+            sb.AppendLine("; In-game shortcuts: Ctrl+F12 show/hide, Ctrl+F11 recenter all.");
             sb.AppendLine();
             sb.AppendLine("[Control]");
             sb.AppendLine("RecenterAll=" + RecenterAll);
@@ -434,8 +448,8 @@ namespace XRWindowPanels
             _tray = new NotifyIcon { Icon = AppIcon, Text = "XR Window Panels", Visible = true };
             _tray.DoubleClick += delegate { RestoreFromTray(); };
             var menu = new ContextMenuStrip();
-            menu.Items.Add("Abrir", null, delegate { RestoreFromTray(); });
-            menu.Items.Add("Sair", null, delegate { Close(); });
+            menu.Items.Add(L.T("Open", "Abrir"), null, delegate { RestoreFromTray(); });
+            menu.Items.Add(L.T("Exit", "Sair"), null, delegate { Close(); });
             _tray.ContextMenuStrip = menu;
             Resize += delegate
             {
@@ -443,7 +457,7 @@ namespace XRWindowPanels
                 Hide();
                 if (!_trayHintShown)
                 {
-                    _tray.ShowBalloonTip(3000, "XR Window Panels", "Continua rodando na bandeja: os atalhos seguem funcionando.", ToolTipIcon.Info);
+                    _tray.ShowBalloonTip(3000, "XR Window Panels", L.T("Still running in the tray: shortcuts keep working.", "Continua rodando na bandeja: os atalhos seguem funcionando."), ToolTipIcon.Info);
                     _trayHintShown = true;
                 }
             };
@@ -539,7 +553,7 @@ namespace XRWindowPanels
         void BuildUi()
         {
             // Panel list
-            AddLabel(this, "Painéis", 12, 10, 170);
+            AddLabel(this, L.T("Panels", "Painéis"), 12, 10, 170);
             _list = Add(this, new ListBox { IntegralHeight = false }, 12, 30, 172, 410);
             _list.SelectedIndexChanged += delegate
             {
@@ -547,64 +561,64 @@ namespace XRWindowPanels
                 ShowPanel();
                 HighlightSelected();
             };
-            var addBtn = Add(this, new Button { Text = "+ Adicionar" }, 12, 446, 84, 28);
+            var addBtn = Add(this, new Button { Text = L.T("+ Add", "+ Adicionar") }, 12, 446, 84, 28);
             addBtn.Click += delegate { AddPanel(); };
-            var delBtn = Add(this, new Button { Text = "Remover" }, 100, 446, 84, 28);
+            var delBtn = Add(this, new Button { Text = L.T("Remove", "Remover") }, 100, 446, 84, 28);
             delBtn.Click += delegate { RemovePanel(); };
-            var keysBtn = Add(this, new Button { Text = "⌨  Atalhos..." }, 12, 480, 172, 28);
+            var keysBtn = Add(this, new Button { Text = L.T("⌨  Shortcuts...", "⌨  Atalhos...") }, 12, 480, 172, 28);
             keysBtn.Click += delegate { OpenBindings(); };
 
             // Window
-            var gWin = Add(this, new GroupBox { Text = "Janela" }, 196, 6, 552, 124);
+            var gWin = Add(this, new GroupBox { Text = L.T("Window", "Janela") }, 196, 6, 552, 124);
             _windows = Add(gWin, new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList }, 12, 22, 420, 24);
             _windows.SelectionChangeCommitted += delegate { PickWindow(); };
-            var refresh = Add(gWin, new Button { Text = "Atualizar lista" }, 440, 21, 100, 26);
+            var refresh = Add(gWin, new Button { Text = L.T("Refresh list", "Atualizar lista") }, 440, 21, 100, 26);
             refresh.Click += delegate { RefreshWindows(); };
-            AddLabel(gWin, "Título contém:", 12, 58, 95);
+            AddLabel(gWin, L.T("Title contains:", "Título contém:"), 12, 58, 95);
             _title = Add(gWin, new TextBox(), 108, 55, 200, 24);
-            AddLabel(gWin, "Processo:", 318, 58, 65);
+            AddLabel(gWin, L.T("Process:", "Processo:"), 318, 58, 65);
             _process = Add(gWin, new TextBox(), 386, 55, 154, 24);
             foreach (var tb in new[] { _title, _process })
             {
                 tb.Leave += delegate { TargetEdited(); };
                 tb.KeyDown += delegate (object s, KeyEventArgs e) { if (e.KeyCode == Keys.Enter) { TargetEdited(); e.SuppressKeyPress = true; } };
             }
-            _enabled = Add(gWin, new CheckBox { Text = "Ativo" }, 12, 90, 80, 22);
+            _enabled = Add(gWin, new CheckBox { Text = L.T("Enabled", "Ativo") }, 12, 90, 80, 22);
             _enabled.CheckedChanged += delegate { Edit(delegate (PanelData p) { p.Enabled = _enabled.Checked; }); };
             _panelStatus = AddLabel(gWin, "", 108, 93, 432);
             _panelControls.AddRange(new Control[] { _windows, _title, _process, _enabled });
 
             // Position
-            var gPos = Add(this, new GroupBox { Text = "Posição (segure o botão para repetir)" }, 196, 134, 552, 236);
-            var recenter = Add(gPos, new Button { Text = "Recentralizar" }, 12, 22, 120, 30);
+            var gPos = Add(this, new GroupBox { Text = L.T("Position (hold a button to repeat)", "Posição (segure o botão para repetir)") }, 196, 134, 552, 236);
+            var recenter = Add(gPos, new Button { Text = L.T("Recenter", "Recentralizar") }, 12, 22, 120, 30);
             recenter.Click += delegate { RunAction("recenter"); };
             _panelControls.Add(recenter);
-            var recenterAll = Add(gPos, new Button { Text = "Recentralizar todos" }, 138, 22, 140, 30);
+            var recenterAll = Add(gPos, new Button { Text = L.T("Recenter all", "Recentralizar todos") }, 138, 22, 140, 30);
             recenterAll.Click += delegate { RunAction("recenterAll"); };
-            var reset = Add(gPos, new Button { Text = "Posição padrão" }, 284, 22, 115, 30);
+            var reset = Add(gPos, new Button { Text = L.T("Default position", "Posição padrão") }, 284, 22, 115, 30);
             reset.Click += delegate { Edit(delegate (PanelData p) { p.X = 0; p.Y = -0.15f; p.Z = -0.7f; p.Yaw = 0; p.Pitch = 0; }); };
             _panelControls.Add(reset);
-            AddLabel(gPos, "Passo:", 410, 29, 42);
+            AddLabel(gPos, L.T("Step:", "Passo:"), 410, 29, 42);
             _step = Add(gPos, new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList }, 454, 26, 86, 24);
-            _step.Items.AddRange(new object[] { "Fino", "Normal", "Grosso" });
+            _step.Items.AddRange(new object[] { L.T("Fine", "Fino"), "Normal", L.T("Coarse", "Grosso") });
             _step.SelectedIndex = 1;
 
             const float move = 0.01f, size = 0.01f, dist = 0.02f, tilt = 2f;
-            AddLabel(gPos, "Mover", 12, 62, 120);
+            AddLabel(gPos, L.T("Move", "Mover"), 12, 62, 120);
             AddStep(gPos, "up", "▲", 52, 82, 40, delegate (PanelData p, float k) { p.Y += move * k; });
             AddStep(gPos, "left", "◀", 10, 114, 40, delegate (PanelData p, float k) { p.X -= move * k; });
             AddStep(gPos, "right", "▶", 94, 114, 40, delegate (PanelData p, float k) { p.X += move * k; });
             AddStep(gPos, "down", "▼", 52, 146, 40, delegate (PanelData p, float k) { p.Y -= move * k; });
 
-            AddLabel(gPos, "Tamanho", 160, 62, 100);
-            AddStep(gPos, "bigger", "Maior", 160, 82, 95, delegate (PanelData p, float k) { p.Width += size * k; });
-            AddStep(gPos, "smaller", "Menor", 160, 116, 95, delegate (PanelData p, float k) { p.Width = Math.Max(0.05f, p.Width - size * k); });
+            AddLabel(gPos, L.T("Size", "Tamanho"), 160, 62, 100);
+            AddStep(gPos, "bigger", L.T("Bigger", "Maior"), 160, 82, 95, delegate (PanelData p, float k) { p.Width += size * k; });
+            AddStep(gPos, "smaller", L.T("Smaller", "Menor"), 160, 116, 95, delegate (PanelData p, float k) { p.Width = Math.Max(0.05f, p.Width - size * k); });
 
-            AddLabel(gPos, "Distância", 270, 62, 100);
-            AddStep(gPos, "nearer", "Mais perto", 270, 82, 95, delegate (PanelData p, float k) { p.Z = Math.Min(-0.1f, p.Z + dist * k); });
-            AddStep(gPos, "further", "Mais longe", 270, 116, 95, delegate (PanelData p, float k) { p.Z -= dist * k; });
+            AddLabel(gPos, L.T("Distance", "Distância"), 270, 62, 100);
+            AddStep(gPos, "nearer", L.T("Nearer", "Mais perto"), 270, 82, 95, delegate (PanelData p, float k) { p.Z = Math.Min(-0.1f, p.Z + dist * k); });
+            AddStep(gPos, "further", L.T("Further", "Mais longe"), 270, 116, 95, delegate (PanelData p, float k) { p.Z -= dist * k; });
 
-            AddLabel(gPos, "Inclinar / girar", 386, 62, 150);
+            AddLabel(gPos, L.T("Tilt / turn", "Inclinar / girar"), 386, 62, 150);
             AddStep(gPos, "tiltUp", "▲", 428, 82, 40, delegate (PanelData p, float k) { p.Pitch -= tilt * k; });
             AddStep(gPos, "turnLeft", "◀", 386, 114, 40, delegate (PanelData p, float k) { p.Yaw -= tilt * k; });
             AddStep(gPos, "turnRight", "▶", 470, 114, 40, delegate (PanelData p, float k) { p.Yaw += tilt * k; });
@@ -612,10 +626,9 @@ namespace XRWindowPanels
 
             _pose = AddLabel(gPos, "", 12, 184, 528);
             _pose.ForeColor = SystemColors.GrayText;
-            _saveRecenter = Add(gPos, new CheckBox { Text = "Lembrar posição recentralizada na próxima vez que abrir o jogo" }, 12, 204, 528, 24);
+            _saveRecenter = Add(gPos, new CheckBox { Text = L.T("Remember the recentered position next time the game starts", "Lembrar posição recentralizada na próxima vez que abrir o jogo") }, 12, 204, 528, 24);
             new ToolTip().SetToolTip(_saveRecenter,
-                "Ligado: ao recentralizar, a posição é salva e os painéis voltam ao mesmo lugar na próxima sessão.\n" +
-                "Desligado: a recentralização vale só enquanto o jogo estiver aberto.");
+                L.T("On: recentering saves the position, and panels come back to the same spot next session.\nOff: recentering only lasts while the game is running.", "Ligado: ao recentralizar, a posição é salva e os painéis voltam ao mesmo lugar na próxima sessão.\nDesligado: a recentralização vale só enquanto o jogo estiver aberto."));
             _saveRecenter.CheckedChanged += delegate
             {
                 if (_loading) return;
@@ -624,8 +637,8 @@ namespace XRWindowPanels
             };
 
             // Appearance
-            var gLook = Add(this, new GroupBox { Text = "Aparência e desempenho" }, 196, 374, 552, 130);
-            AddLabel(gLook, "Opacidade", 12, 28, 70);
+            var gLook = Add(this, new GroupBox { Text = L.T("Appearance and performance", "Aparência e desempenho") }, 196, 374, 552, 130);
+            AddLabel(gLook, L.T("Opacity", "Opacidade"), 12, 28, 70);
             _opacity = Add(gLook, new TrackBar { Minimum = 10, Maximum = 100, TickFrequency = 10 }, 82, 20, 170, 40);
             _opacityLabel = AddLabel(gLook, "", 254, 28, 45);
             _opacity.ValueChanged += delegate
@@ -633,31 +646,31 @@ namespace XRWindowPanels
                 _opacityLabel.Text = _opacity.Value + "%";
                 Edit(delegate (PanelData p) { p.Opacity = _opacity.Value / 100f; });
             };
-            AddLabel(gLook, "Atualizações/s", 312, 28, 95);
+            AddLabel(gLook, L.T("Updates/s", "Atualizações/s"), 312, 28, 95);
             _fps = Add(gLook, new NumericUpDown { Minimum = 5, Maximum = 90, Increment = 5 }, 410, 25, 60, 24);
             _fps.ValueChanged += delegate { Edit(delegate (PanelData p) { p.MaxFps = (int)_fps.Value; }); };
-            new ToolTip().SetToolTip(_fps, "Quantas vezes por segundo a imagem do painel é atualizada. Menos = mais leve para o jogo.");
+            new ToolTip().SetToolTip(_fps, L.T("How many times per second the panel image is refreshed. Lower = lighter on the game.", "Quantas vezes por segundo a imagem do painel é atualizada. Menos = mais leve para o jogo."));
 
-            _chroma = Add(gLook, new CheckBox { Text = "Remover cor de fundo" }, 12, 66, 150, 22);
+            _chroma = Add(gLook, new CheckBox { Text = L.T("Chroma key", "Remover cor de fundo") }, 12, 66, 150, 22);
             _chroma.CheckedChanged += delegate { Edit(delegate (PanelData p) { p.ChromaKey = _chroma.Checked; }); };
             _color = Add(gLook, new Button { FlatStyle = FlatStyle.Flat }, 166, 64, 40, 24);
             _color.Click += delegate { PickColor(); };
-            AddLabel(gLook, "Tolerância", 222, 68, 70);
+            AddLabel(gLook, L.T("Tolerance", "Tolerância"), 222, 68, 70);
             _tolerance = Add(gLook, new TrackBar { Minimum = 1, Maximum = 60, TickFrequency = 5 }, 292, 60, 180, 40);
             _tolerance.ValueChanged += delegate { Edit(delegate (PanelData p) { p.KeyTolerance = _tolerance.Value / 100f; }); };
-            _alpha = Add(gLook, new CheckBox { Text = "Usar transparência da própria janela" }, 12, 96, 260, 22);
+            _alpha = Add(gLook, new CheckBox { Text = L.T("Use the window's own transparency", "Usar transparência da própria janela") }, 12, 96, 260, 22);
             _alpha.CheckedChanged += delegate { Edit(delegate (PanelData p) { p.UseWindowAlpha = _alpha.Checked; }); };
             _panelControls.AddRange(new Control[] { _opacity, _fps, _chroma, _color, _tolerance, _alpha });
 
             // Footer
             _game = AddLabel(this, "", 12, 516, 556);
             _game.Height = 20;
-            var autostart = Add(this, new CheckBox { Text = "Iniciar com o Windows", Checked = AutoStart.Enabled }, 580, 513, 168, 24);
-            new ToolTip().SetToolTip(autostart, "Abre o app minimizado na bandeja ao entrar no Windows, para os atalhos já funcionarem.");
+            var autostart = Add(this, new CheckBox { Text = L.T("Start with Windows", "Iniciar com o Windows"), Checked = AutoStart.Enabled }, 580, 513, 168, 24);
+            new ToolTip().SetToolTip(autostart, L.T("Opens the app minimized to the tray when you sign in to Windows, so shortcuts work right away.", "Abre o app minimizado na bandeja ao entrar no Windows, para os atalhos já funcionarem."));
             autostart.CheckedChanged += delegate
             {
                 try { AutoStart.Enabled = autostart.Checked; }
-                catch (Exception ex) { _game.Text = "Erro: " + ex.Message; }
+                catch (Exception ex) { _game.Text = L.T("Error: ", "Erro: ") + ex.Message; }
             };
             try { AutoStart.Refresh(); } catch (Exception) { }
         }
@@ -678,7 +691,7 @@ namespace XRWindowPanels
         {
             var p = Current;
             foreach (var c in _panelControls) c.Enabled = p != null;
-            if (p == null) { _pose.Text = "Adicione um painel para começar."; return; }
+            if (p == null) { _pose.Text = L.T("Add a panel to get started.", "Adicione um painel para começar."); return; }
             _loading = true;
             _title.Text = p.Window;
             _process.Text = p.Process;
@@ -699,7 +712,7 @@ namespace XRWindowPanels
         void ShowPose(PanelData p)
         {
             _pose.Text = string.Format(CultureInfo.InvariantCulture,
-                "X {0:0.00}  Y {1:0.00}  Distância {2:0.00} m   |   Largura {3:0.00} m   |   Inclinação {4:0}°  Giro {5:0}°",
+                L.T("X {0:0.00}  Y {1:0.00}  Distance {2:0.00} m   |   Width {3:0.00} m   |   Tilt {4:0}°  Turn {5:0}°", "X {0:0.00}  Y {1:0.00}  Distância {2:0.00} m   |   Largura {3:0.00} m   |   Inclinação {4:0}°  Giro {5:0}°"),
                 p.X, p.Y, -p.Z, p.Width, -p.Pitch, p.Yaw);
         }
 
@@ -759,7 +772,7 @@ namespace XRWindowPanels
             }
             catch (Exception ex)
             {
-                _game.Text = "Erro ao salvar: " + ex.Message;
+                _game.Text = L.T("Error saving: ", "Erro ao salvar: ") + ex.Message;
             }
         }
 
@@ -813,7 +826,7 @@ namespace XRWindowPanels
         {
             var p = Current;
             if (p == null) return;
-            if (MessageBox.Show(this, "Remover o painel \"" + p + "\"?", "XR Window Panels",
+            if (MessageBox.Show(this, L.T("Remove panel \"", "Remover o painel \"") + p + "\"?", "XR Window Panels",
                                 MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
             _cfg.Panels.Remove(p);
             Save();
@@ -832,8 +845,8 @@ namespace XRWindowPanels
             string app;
             bool connected = _link.Connected(out app);
             _game.Text = connected
-                ? "● Conectado ao jogo: " + app + "   (alterações aparecem no VR na hora)"
-                : "○ Nenhum jogo VR com a camada ativa no momento - as alterações ficam salvas";
+                ? L.T("● Connected to game: ", "● Conectado ao jogo: ") + app + L.T("   (changes show up in VR instantly)", "   (alterações aparecem no VR na hora)")
+                : L.T("○ No VR game running the layer right now - changes are saved", "○ Nenhum jogo VR com a camada ativa no momento - as alterações ficam salvas");
             _game.ForeColor = connected ? Color.ForestGreen : SystemColors.GrayText;
 
             var p = Current;
@@ -844,10 +857,11 @@ namespace XRWindowPanels
                 _panelStatus.Text = "";
                 return;
             }
-            string[] names = { "desativado", "procurando a janela...", "iniciando captura...", "visível", "escondido (Ctrl+F12)" };
+            string[] names = L.Pt ? new[] { "desativado", "procurando a janela...", "iniciando captura...", "visível", "escondido (Ctrl+F12)" }
+                          : new[] { "disabled", "looking for the window...", "starting capture...", "visible", "hidden (Ctrl+F12)" };
             string text = state >= 0 && state < names.Length ? names[state] : "?";
-            if (state >= 3) text += string.Format("  -  {0}x{1}, {2} atualizações/s", w, h, fps);
-            _panelStatus.Text = "No VR: " + text;
+            if (state >= 3) text += string.Format(L.T("  -  {0}x{1}, {2} updates/s", "  -  {0}x{1}, {2} atualizações/s"), w, h, fps);
+            _panelStatus.Text = L.T("In VR: ", "No VR: ") + text;
         }
 
         protected override void OnFormClosed(FormClosedEventArgs e)
@@ -896,7 +910,7 @@ namespace XRWindowPanels
         }
     }
 
-    // "Iniciar com o Windows": HKCU Run entry that starts the app minimized to the tray.
+    // "Start with Windows": HKCU Run entry that starts the app minimized to the tray.
     static class AutoStart
     {
         public const string TrayArg = "--tray";

@@ -5,7 +5,7 @@
 #   .\install.ps1 -AllUsers    register machine-wide (HKLM, asks for admin). Needed by apps
 #                              whose built-in OpenXR loader ignores HKCU (e.g. iRacing).
 #
-# NOTE: run this from a normal PowerShell / double-click Instalar.cmd. Do not run it from
+# NOTE: run this from a normal PowerShell / double-click Install.cmd. Do not run it from
 # inside a packaged (MSIX) app such as Claude Desktop: Windows redirects AppData and
 # registry writes from those apps into a private copy that games cannot see.
 param(
@@ -44,7 +44,7 @@ try {
     $lnk = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $desktop 'XR Window Panels.lnk'))
     $lnk.TargetPath = Join-Path $Dest 'XRWindowPanelsControl.exe'
     $lnk.WorkingDirectory = $Dest
-    $lnk.Description = 'Controle dos paineis de janelas no VR'
+    $lnk.Description = 'Control app for the VR window panels'
     $lnk.Save()
   }
 
@@ -65,14 +65,14 @@ try {
   }
 
   Write-Host ""
-  Write-Host "OK - XR Window Panels instalado" -ForegroundColor Green
+  Write-Host "OK - XR Window Panels installed" -ForegroundColor Green
   Write-Host "  DLL:      $Dest"
-  Write-Host "  Registro: $key"
+  Write-Host "  Registry: $key"
   Write-Host "  Config:   $cfgDst"
   Write-Host "  Log:      $(Join-Path $Root 'layer.log')"
 } catch {
-  Write-Host "ERRO: $_" -ForegroundColor Red
-  if ($AllUsers) { Read-Host "Enter para fechar" }
+  Write-Host "ERROR: $_" -ForegroundColor Red
+  if ($AllUsers) { Read-Host "Press Enter to close" }
   exit 1
 }
-if ($AllUsers) { Read-Host "Enter para fechar" }
+if ($AllUsers) { Read-Host "Press Enter to close" }

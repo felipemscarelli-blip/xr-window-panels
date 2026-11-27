@@ -16,5 +16,5 @@ foreach ($hive in 'HKLM:', 'HKCU:') {
 Remove-Item -Recurse -Force (Join-Path $Root 'bin') -ErrorAction SilentlyContinue
 Remove-Item (Join-Path ([Environment]::GetFolderPath('Desktop')) 'XR Window Panels.lnk') -ErrorAction SilentlyContinue
 Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'XRWindowPanels' -ErrorAction SilentlyContinue
-Write-Host 'Desinstalado (config.ini mantido).' -ForegroundColor Green
-Read-Host 'Enter para fechar'
+Write-Host 'Uninstalled (config.ini kept).' -ForegroundColor Green
+Read-Host 'Press Enter to close'

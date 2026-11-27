@@ -1,3 +1,3 @@
 @echo off
-rem Instala o XR Window Panels para todos os apps OpenXR (pede permissao de administrador)
+rem Installs XR Window Panels for all OpenXR apps (asks for administrator permission)
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0install.ps1" -AllUsers

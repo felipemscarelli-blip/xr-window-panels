@@ -245,7 +245,7 @@ namespace XRWindowPanels
         public static string NameOf(ushort vid, ushort pid)
         {
             foreach (var d in _devices.Values) if (d.Vid == vid && d.Pid == pid) return d.Name;
-            return OemName(vid, pid) ?? string.Format("Controle {0:X4}:{1:X4}", vid, pid);
+            return OemName(vid, pid) ?? string.Format(L.T("Controller {0:X4}:{1:X4}", "Controle {0:X4}:{1:X4}"), vid, pid);
         }
 
         static string FriendlyName(IntPtr h, ushort vid, ushort pid)
@@ -273,7 +273,7 @@ namespace XRWindowPanels
                 finally { Marshal.FreeHGlobal(buf); }
             }
             catch (Exception) { }
-            return string.Format("Controle {0:X4}:{1:X4}", vid, pid);
+            return string.Format(L.T("Controller {0:X4}:{1:X4}", "Controle {0:X4}:{1:X4}"), vid, pid);
         }
 
         // Friendly product name registered by Windows for the device.
@@ -372,7 +372,7 @@ namespace XRWindowPanels
                 if ((_mods & 4) != 0) s += "Alt+";
                 return s + KeyName(_vk);
             }
-            string what = _button > 0 ? "botão " + _button : "direcional " + PovArrow(_pov);
+            string what = _button > 0 ? L.T("button ", "botão ") + _button : L.T("D-pad ", "direcional ") + PovArrow(_pov);
             return RawHid.NameOf(_vid, _pid) + " - " + what;
         }
 
@@ -395,24 +395,24 @@ namespace XRWindowPanels
 
         public static readonly ActionDef[] All =
         {
-            new ActionDef("recenter",   "Recentralizar painel selecionado", false),
-            new ActionDef("recenterAll","Recentralizar todos",              false),
-            new ActionDef("toggleAll",  "Mostrar / esconder todos",         false),
-            new ActionDef("nextPanel",  "Próximo painel",                   false),
-            new ActionDef("prevPanel",  "Painel anterior",                  false),
-            new ActionDef("togglePanel","Ativar / desativar painel selecionado", false),
-            new ActionDef("up",         "Mover para cima",                  true),
-            new ActionDef("down",       "Mover para baixo",                 true),
-            new ActionDef("left",       "Mover para a esquerda",            true),
-            new ActionDef("right",      "Mover para a direita",             true),
-            new ActionDef("bigger",     "Maior",                            true),
-            new ActionDef("smaller",    "Menor",                            true),
-            new ActionDef("nearer",     "Mais perto",                       true),
-            new ActionDef("further",    "Mais longe",                       true),
-            new ActionDef("tiltUp",     "Inclinar para cima",               true),
-            new ActionDef("tiltDown",   "Inclinar para baixo",              true),
-            new ActionDef("turnLeft",   "Girar para a esquerda",            true),
-            new ActionDef("turnRight",  "Girar para a direita",             true),
+            new ActionDef("recenter",   L.T("Recenter selected panel", "Recentralizar painel selecionado"), false),
+            new ActionDef("recenterAll",L.T("Recenter all", "Recentralizar todos"),              false),
+            new ActionDef("toggleAll",  L.T("Show / hide all", "Mostrar / esconder todos"),         false),
+            new ActionDef("nextPanel",  L.T("Next panel", "Próximo painel"),                   false),
+            new ActionDef("prevPanel",  L.T("Previous panel", "Painel anterior"),                  false),
+            new ActionDef("togglePanel",L.T("Enable / disable selected panel", "Ativar / desativar painel selecionado"), false),
+            new ActionDef("up",         L.T("Move up", "Mover para cima"),                  true),
+            new ActionDef("down",       L.T("Move down", "Mover para baixo"),                 true),
+            new ActionDef("left",       L.T("Move left", "Mover para a esquerda"),            true),
+            new ActionDef("right",      L.T("Move right", "Mover para a direita"),             true),
+            new ActionDef("bigger",     L.T("Bigger", "Maior"),                            true),
+            new ActionDef("smaller",    L.T("Smaller", "Menor"),                            true),
+            new ActionDef("nearer",     L.T("Nearer", "Mais perto"),                       true),
+            new ActionDef("further",    L.T("Further", "Mais longe"),                       true),
+            new ActionDef("tiltUp",     L.T("Tilt up", "Inclinar para cima"),               true),
+            new ActionDef("tiltDown",   L.T("Tilt down", "Inclinar para baixo"),              true),
+            new ActionDef("turnLeft",   L.T("Turn left", "Girar para a esquerda"),            true),
+            new ActionDef("turnRight",  L.T("Turn right", "Girar para a direita"),             true),
         };
 
         public static ActionDef Get(string id)
@@ -446,7 +446,7 @@ namespace XRWindowPanels
 
         public void Save()
         {
-            var sb = new StringBuilder("; XR Window Panels - atalhos (editados pelo app de controle)\r\n");
+            var sb = new StringBuilder("; XR Window Panels - shortcuts (edited by the control app)\r\n");
             foreach (var a in ActionDef.All)
             {
                 Binding b;
@@ -519,7 +519,7 @@ namespace XRWindowPanels
         public CaptureForm(string actionLabel)
         {
             RawHid.Init();
-            Text = "Definir atalho";
+            Text = L.T("Set shortcut", "Definir atalho");
             Font = new Font("Segoe UI", 9f);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(480, 214);
@@ -532,23 +532,23 @@ namespace XRWindowPanels
             title.SetBounds(16, 14, 450, 24);
             var hint = new Label
             {
-                Text = "Pressione uma tecla (pode combinar com Ctrl, Shift ou Alt) ou um botão do volante / button box.\nEsc cancela.",
+                Text = L.T("Press a key (Ctrl, Shift or Alt combos work) or a button on your wheel / button box.\nEsc cancels.", "Pressione uma tecla (pode combinar com Ctrl, Shift ou Alt) ou um botão do volante / button box.\nEsc cancela."),
                 AutoSize = false
             };
             hint.SetBounds(16, 42, 450, 54);
             _devices = new Label { AutoSize = false, ForeColor = SystemColors.GrayText };
             _devices.SetBounds(16, 100, 450, 34);
-            _live = new Label { AutoSize = false, ForeColor = SystemColors.GrayText, Text = "Aguardando entrada..." };
+            _live = new Label { AutoSize = false, ForeColor = SystemColors.GrayText, Text = L.T("Waiting for input...", "Aguardando entrada...") };
             _live.SetBounds(16, 136, 450, 34);
-            var cancel = new Button { Text = "Cancelar", DialogResult = DialogResult.Cancel };
+            var cancel = new Button { Text = L.T("Cancel", "Cancelar"), DialogResult = DialogResult.Cancel };
             cancel.SetBounds(376, 176, 90, 28);
             Controls.AddRange(new Control[] { title, hint, _devices, _live, cancel });
             CancelButton = cancel;
 
             var names = new List<string>();
             foreach (var d in RawHid.Devices) names.Add(d.Name);
-            _devices.Text = names.Count > 0 ? "Controles detectados: " + string.Join(", ", names.ToArray())
-                                            : "Nenhum volante / controle HID detectado.";
+            _devices.Text = names.Count > 0 ? L.T("Detected controllers: ", "Controles detectados: ") + string.Join(", ", names.ToArray())
+                                            : L.T("No wheel / HID controller detected.", "Nenhum volante / controle HID detectado.");
 
             RawHid.Changed += OnHid;
             Snapshot(_held);  // ignore anything already held when the dialog opens
@@ -562,9 +562,9 @@ namespace XRWindowPanels
             if (d.Pressed.Count == 0 && d.Pov < 0) return;
             var parts = new List<string>();
             foreach (int b in d.Pressed) parts.Add(b.ToString());
-            string text = d.Name + ": " + (parts.Count > 0 ? "botões " + string.Join(", ", parts.ToArray()) : "");
-            if (d.Pov >= 0) text += "  direcional " + (d.Pov / 100) + "°";
-            _live.Text = "Recebendo: " + text;
+            string text = d.Name + ": " + (parts.Count > 0 ? L.T("buttons ", "botões ") + string.Join(", ", parts.ToArray()) : "");
+            if (d.Pov >= 0) text += L.T("  D-pad ", "  direcional ") + (d.Pov / 100) + "°";
+            _live.Text = L.T("Receiving: ", "Recebendo: ") + text;
         }
 
         // Raw ids of everything currently pressed (keys without modifiers, controller buttons/POV).
@@ -634,7 +634,7 @@ namespace XRWindowPanels
         {
             RawHid.Init();
             _store = store;
-            Text = "Atalhos - teclado e volante";
+            Text = L.T("Shortcuts - keyboard and wheel", "Atalhos - teclado e volante");
             Font = new Font("Segoe UI", 9f);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(560, 520);
@@ -644,26 +644,24 @@ namespace XRWindowPanels
 
             var hint = new Label
             {
-                Text = "Duplo clique numa ação para definir o atalho. Os atalhos funcionam com o jogo em foco, " +
-                       "enquanto o app estiver aberto (pode ficar minimizado na bandeja).\n" +
-                       "Ctrl+F11 e Ctrl+F12 já são atalhos fixos da camada.",
+                Text = L.T("Double-click an action to set its shortcut. Shortcuts work while the game has focus, as long as the app is open (it can stay minimized in the tray).\nCtrl+F11 and Ctrl+F12 are built into the layer.", "Duplo clique numa ação para definir o atalho. Os atalhos funcionam com o jogo em foco, enquanto o app estiver aberto (pode ficar minimizado na bandeja).\nCtrl+F11 e Ctrl+F12 já são atalhos fixos da camada."),
                 AutoSize = false
             };
             hint.SetBounds(12, 10, 536, 52);
 
             _view = new ListView { View = View.Details, FullRowSelect = true, MultiSelect = false, HideSelection = false, GridLines = true };
             _view.SetBounds(12, 66, 536, 402);
-            _view.Columns.Add("Ação", 230);
-            _view.Columns.Add("Atalho", 300);
+            _view.Columns.Add(L.T("Action", "Ação"), 230);
+            _view.Columns.Add(L.T("Shortcut", "Atalho"), 300);
             _view.DoubleClick += delegate { Define(); };
 
-            var define = new Button { Text = "Definir..." };
+            var define = new Button { Text = L.T("Set...", "Definir...") };
             define.SetBounds(12, 478, 100, 30);
             define.Click += delegate { Define(); };
-            var clear = new Button { Text = "Limpar" };
+            var clear = new Button { Text = L.T("Clear", "Limpar") };
             clear.SetBounds(118, 478, 100, 30);
             clear.Click += delegate { Clear(); };
-            var close = new Button { Text = "Fechar", DialogResult = DialogResult.OK };
+            var close = new Button { Text = L.T("Close", "Fechar"), DialogResult = DialogResult.OK };
             close.SetBounds(448, 478, 100, 30);
             CancelButton = close;
 

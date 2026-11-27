@@ -2,101 +2,103 @@
 
 # XR Window Panels
 
-Camada (API layer) OpenXR que mostra janelas do Windows como painéis dentro de apps e jogos VR em Direct3D 11 (iRacing, ACC, LMU, AMS2, DesktopXR...). Feita para levar overlays de telemetria e coaching para dentro do VR, como as linhas de acelerador e freio de uma volta de referência.
+An OpenXR API layer that shows desktop windows as floating panels inside Direct3D 11 VR apps and games (iRacing, ACC, LMU, AMS2, DesktopXR...). It was made to bring telemetry and coaching overlays into VR, such as the throttle and brake traces of a reference lap.
 
-> **English:** A lightweight OpenXR API layer that shows any desktop window (e.g. telemetry or coaching overlays) as a floating panel inside D3D11 OpenXR games. It includes a control app to pick windows and position them live. The capture runs off the game's render thread for minimal performance impact. Download the zip from [Releases](../../releases), extract it and run `Instalar.cmd`.
+> 🇧🇷 [Versão em português](README.pt-BR.md)
 
-## Instalar
+## Install
 
-1. Baixe o zip mais recente em [Releases](../../releases) e extraia numa pasta.
-2. Dê dois cliques em **`Instalar.cmd`** pelo Explorador de Arquivos e aceite o aviso de administrador.
+1. Download the latest zip from [Releases](../../releases) and extract it to a folder.
+2. Double-click **`Install.cmd`** in File Explorer and accept the administrator prompt.
 
-- A camada é registrada para a máquina toda (HKLM).
-- O app de controle é copiado e ganha um atalho na área de trabalho: **XR Window Panels**.
+- The layer is registered machine-wide (HKLM).
+- The control app is copied over and gets a desktop shortcut: **XR Window Panels**.
 
-Rode o instalador pelo Explorador ou por um PowerShell normal, nunca de dentro de um app empacotado (MSIX). O Windows desvia as gravações desses apps para uma cópia privada, e os jogos não enxergam a camada.
+Run the installer from File Explorer or a normal PowerShell, never from inside a packaged (MSIX) app. Windows redirects those apps' writes to a private copy, and games won't see the layer.
 
-Para remover, use **`Desinstalar.cmd`**. O `config.ini` é mantido.
+To remove it, use **`Uninstall.cmd`**. Your `config.ini` is kept.
 
-## App de controle (`XRWindowPanelsControl.exe`)
+## Control app (`XRWindowPanelsControl.exe`)
 
-- **Painéis**: adicione um painel por janela.
-- **Janela**: escolha a janela na lista. Ela é identificada por "Título contém" e "Processo". Para janelas cujo título muda (como as abas do Chrome), apague o título e deixe só o processo.
-- **Posição**: estes botões podem ser segurados para repetir.
-  - Recentralizar (este painel) e Recentralizar todos
-  - Mover ▲◀▶▼
-  - Maior/Menor
-  - Mais perto/Mais longe
-  - Inclinar/girar
-  - O "Passo" escolhe entre ajuste fino, normal e grosso.
-- **Aparência**: opacidade, remover cor de fundo (chroma key), transparência da própria janela.
-- **Atualizações/s**: quantas vezes por segundo a imagem do painel é atualizada. Quanto menor, mais leve.
-- O rodapé mostra se há um jogo VR conectado, e o status de cada painel aparece no VR.
+- **Panels**: add one panel per window.
+- **Window**: pick the window from the list. It is matched by "Title contains" and "Process". For windows whose title changes (such as Chrome tabs), clear the title and keep only the process.
+- **Position**: these buttons can be held down to repeat.
+  - Recenter (this panel) and Recenter all
+  - Move ▲◀▶▼
+  - Bigger/Smaller
+  - Nearer/Further
+  - Tilt/turn
+  - "Step" switches between fine, normal and coarse adjustment.
+- **Appearance**: opacity, chroma key (remove a background color), the window's own transparency.
+- **Updates/s**: how many times per second the panel image is refreshed. Lower is lighter.
+- The footer shows whether a VR game is connected, and each panel's status in VR.
 
-As mudanças aparecem no VR na hora. Ficam salvas em `%LOCALAPPDATA%\XRWindowPanels\config.ini`.
+The app is in English, or in Portuguese when Windows is set to Portuguese. To force a language, set the `XRWP_LANG` environment variable to `en` or `pt`.
 
-- **Lembrar posição recentralizada** (opção no grupo Posição, desligada por padrão): com ela ligada, ao recentralizar um painel, a camada salva essa posição em `anchors.ini` e a restaura na próxima vez que você abrir o jogo. Desligada, a recentralização vale só enquanto o jogo estiver aberto.
-  - A posição fica no espaço STAGE do runtime, que é fixo na sala. Assim o painel volta ao mesmo lugar do cockpit mesmo que o runtime recentralize a visão.
-  - Se o runtime não tiver STAGE, a camada usa o espaço LOCAL.
-  - Se você refizer a configuração da sala no headset, recentralize de novo.
-- **Iniciar com o Windows**: marque a opção no rodapé do app. Ele passa a abrir junto com o Windows, já minimizado na bandeja, para os atalhos funcionarem desde o começo.
-  - Abrir o app de novo (pelo atalho) traz a janela que já está aberta, sem abrir uma segunda cópia.
+Changes show up in VR instantly. They are saved in `%LOCALAPPDATA%\XRWindowPanels\config.ini`.
 
-## Atalhos no jogo
+- **Remember the recentered position** (option in the Position group, off by default): when on, recentering a panel makes the layer save that position in `anchors.ini` and restore it the next time you start the game. When off, recentering only lasts while the game is running.
+  - The position is stored in the runtime's STAGE space, which is fixed to the room. That way the panel comes back to the same spot in the cockpit even if the runtime recenters the view.
+  - If the runtime has no STAGE space, the layer uses LOCAL space.
+  - If you redo the room setup on your headset, recenter again.
+- **Start with Windows**: tick the option in the app's footer. The app then starts with Windows, minimized to the tray, so shortcuts work from the start.
+  - Opening the app again (from the shortcut) brings up the window that is already running instead of a second copy.
 
-Atalhos fixos da camada (funcionam mesmo sem o app aberto):
+## In-game shortcuts
 
-- `Ctrl+F12`: mostra/esconde os painéis. Escondidos, eles não gastam nada de GPU.
-- `Ctrl+F11`: recentraliza todos os painéis na frente da cabeça.
+Built-in layer shortcuts (they work even without the app open):
 
-### Atalhos personalizados: teclado, volante e button box
+- `Ctrl+F12`: show/hide the panels. While hidden, they use no GPU at all.
+- `Ctrl+F11`: recenter all panels in front of your head.
 
-No app de controle, clique em **⌨ Atalhos...** e dê um duplo clique numa ação. Depois aperte a tecla (pode combinar com Ctrl, Shift ou Alt) ou o botão do volante, da button box ou do joystick.
+### Custom shortcuts: keyboard, wheel and button box
 
-- **Ações disponíveis**:
-  - Recentralizar (selecionado / todos)
-  - Mostrar/esconder todos
-  - Próximo/anterior painel
-  - Ativar/desativar painel
-  - Mover ▲◀▶▼, Maior/Menor, Mais perto/longe, Inclinar/girar. Esses movimentos repetem enquanto o botão estiver pressionado.
-- **Qual painel se move**: as ações de movimento valem para o painel selecionado. Ao trocar de painel, ele ganha uma **borda amarela por 1,5 s no VR**, para você saber qual está selecionado.
-- **Controles**: volantes, button boxes e joysticks são lidos via Raw Input (HID), sem limite de botões (bases Simagic, por exemplo, expõem mais de 100), incluindo o direcional (POV/hat). A janela de captura mostra ao vivo o que cada controle está enviando.
-- **App aberto**: os atalhos funcionam com o jogo em foco, desde que o app esteja aberto. Minimizado, ele vai para a bandeja e continua funcionando.
-- **Onde ficam salvos**: `%LOCALAPPDATA%\XRWindowPanels\bindings.ini`.
+In the control app, click **⌨ Shortcuts...** and double-click an action. Then press the key (Ctrl, Shift or Alt combos work) or the button on your wheel, button box or joystick.
 
-## Desempenho
+- **Available actions**:
+  - Recenter (selected / all)
+  - Show/hide all
+  - Next/previous panel
+  - Enable/disable panel
+  - Move ▲◀▶▼, Bigger/Smaller, Nearer/Further, Tilt/turn. These moves repeat while the button is held.
+- **Which panel moves**: move actions apply to the selected panel. When you switch panels, it gets a **yellow border for 1.5 s in VR**, so you know which one is selected.
+- **Controllers**: wheels, button boxes and joysticks are read through Raw Input (HID), with no button limit (Simagic bases, for example, expose more than 100), including the D-pad (POV/hat). The capture dialog shows live what each controller is sending.
+- **App open**: shortcuts work while the game has focus, as long as the app is open. Minimized, it goes to the tray and keeps working.
+- **Where they are saved**: `%LOCALAPPDATA%\XRWindowPanels\bindings.ini`.
 
-O objetivo é que a camada quase não custe nada para o jogo:
+## Performance
 
-- **Fora da thread de renderização do jogo**: buscar a janela, iniciar a captura e ler a configuração rodam em threads separadas, de baixa prioridade.
-- **Captura separada do jogo**: usa um dispositivo gráfico próprio (com prioridade de GPU reduzida) e passa a imagem por uma textura compartilhada. Nada espera: se o recurso estiver ocupado, tenta de novo no frame seguinte.
-- **Trabalho só quando muda**: a GPU só trabalha quando a janela muda, e no máximo nas atualizações/s configuradas (30 por padrão). Nos outros frames, o custo é só repetir o painel.
-- **Estado do jogo intocado**: o estado do Direct3D do jogo é salvo e restaurado só nos frames em que há algo para desenhar.
+The goal is for the layer to cost the game almost nothing:
+
+- **Off the game's render thread**: finding the window, starting the capture and reading the config run on separate low-priority threads.
+- **Capture separate from the game**: it uses its own graphics device (with lowered GPU priority) and hands the image over through a shared texture. Nothing waits: if the resource is busy, it tries again next frame.
+- **Work only on change**: the GPU only works when the window changes, and at most at the configured updates/s (30 by default). On other frames, the only cost is resubmitting the panel.
+- **Game state untouched**: the game's Direct3D state is saved and restored only on frames that have something to draw.
 
 ## Log
 
 `%LOCALAPPDATA%\XRWindowPanels\layer.log`
 
-## Compilar
+## Build
 
-Precisa do Visual Studio 2022 Build Tools (C++), do CMake e do git. O app de controle usa o `csc.exe` do .NET Framework, que já vem no Windows.
+Requires Visual Studio 2022 Build Tools (C++), CMake and git. The control app uses the .NET Framework `csc.exe` that ships with Windows.
 
 ```powershell
-cmake -S . -B <pasta-curta>\build -G "Visual Studio 17 2022" -A x64
-cmake --build <pasta-curta>\build --config Release
+cmake -S . -B <short-folder>\build -G "Visual Studio 17 2022" -A x64
+cmake --build <short-folder>\build --config Release
 ```
 
-Use uma pasta de build com caminho curto: o MSBuild falha com caminhos acima de 260 caracteres.
+Use a build folder with a short path: MSBuild fails on paths longer than 260 characters.
 
-Ferramenta de teste sem VR:
+Test tool that works without VR:
 
 ```powershell
 capture_test --list
 capture_test --config
-capture_test "Google Chrome" saida.bmp
+capture_test "Google Chrome" output.bmp
 ```
 
-## Limitações
+## Limitations
 
-- Funciona só com jogos em Direct3D 11.
-- Não dá para interagir com o painel usando os controles de VR.
+- Direct3D 11 games only.
+- You can't interact with the panels using VR controllers.

@@ -9,15 +9,15 @@
 namespace wp {
 
 static const wchar_t kDefaultConfig[] =
-    L"; XR Window Panels - configuracao\n"
-    L"; Use o XRWindowPanelsControl.exe para editar, ou edite aqui (relido automaticamente).\n"
+    L"; XR Window Panels - configuration\n"
+    L"; Edit with XRWindowPanelsControl.exe, or edit here (reloaded automatically).\n"
     L";\n"
-    L"; Atalhos no jogo: Ctrl+F12 mostra/esconde, Ctrl+F11 recentraliza todos os paineis.\n"
+    L"; In-game shortcuts: Ctrl+F12 show/hide, Ctrl+F11 recenter all panels.\n"
     L";\n"
-    L"; Window   parte do titulo da janela (opcional se Process estiver preenchido)\n"
-    L"; Process  nome do executavel, ex.: chrome.exe (opcional)\n"
-    L"; X Y Z    metros (X direita, Y cima, Z negativo = frente); Yaw/Pitch em graus\n"
-    L"; Width    largura em metros; MaxFps = atualizacoes por segundo da captura\n"
+    L"; Window   part of the window title (optional if Process is set)\n"
+    L"; Process  executable name, e.g. chrome.exe (optional)\n"
+    L"; X Y Z    meters (X right, Y up, negative Z = forward); Yaw/Pitch in degrees\n"
+    L"; Width    width in meters; MaxFps = capture updates per second\n"
     L"\n"
     L"[Panel1]\n"
     L"Window=Track Titan\n"
