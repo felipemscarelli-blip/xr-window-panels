@@ -22,6 +22,8 @@ Para remover, use **`Uninstall.cmd`**. O `config.ini` é mantido.
 
 - **Painéis**: adicione um painel por janela.
 - **Janela**: escolha a janela na lista. Ela é identificada por "Título contém" e "Processo". Para janelas cujo título muda (como as abas do Chrome), apague o título e deixe só o processo.
+- **Mostrar cursor do mouse**: desenha o cursor quando ele está sobre a janela. Desligado por padrão.
+- **O app de controle dentro do VR**: o primeiro painel é o próprio app, já ativo e com o cursor ligado, à sua direita. Use-o para ajustar tudo sem tirar o headset. Deixe o app aberto atrás do jogo (minimizado, ele vai para a bandeja e a janela some).
 - **Posição**: estes botões podem ser segurados para repetir.
   - Recentralizar (este painel) e Recentralizar todos
   - Mover ▲◀▶▼

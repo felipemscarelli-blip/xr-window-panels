@@ -18,17 +18,20 @@ static const wchar_t kDefaultConfig[] =
     L"; Process  executable name, e.g. chrome.exe (optional)\n"
     L"; X Y Z    meters (X right, Y up, negative Z = forward); Yaw/Pitch in degrees\n"
     L"; Width    width in meters; MaxFps = capture updates per second\n"
+    L"; ShowCursor  1 = draw the mouse cursor over the window\n"
     L"\n"
+    L"; Panel1 is the control app itself, so you can adjust everything from inside VR.\n"
     L"[Panel1]\n"
-    L"Window=Track Titan\n"
-    L"Process=\n"
+    L"Window=XR Window Panels\n"
+    L"Process=XRWindowPanelsControl.exe\n"
     L"Enabled=1\n"
-    L"X=0\n"
-    L"Y=-0.15\n"
-    L"Z=-0.7\n"
-    L"Yaw=0\n"
+    L"ShowCursor=1\n"
+    L"X=0.4\n"
+    L"Y=-0.1\n"
+    L"Z=-0.6\n"
+    L"Yaw=-30\n"
     L"Pitch=0\n"
-    L"Width=0.35\n"
+    L"Width=0.4\n"
     L"Opacity=1\n"
     L"UseWindowAlpha=0\n"
     L"ChromaKey=0\n"
@@ -253,6 +256,7 @@ bool LoadConfig(const std::wstring& path, Config& cfg) {
     pc.keyColor[2] = (rgb & 0xFF) / 255.0f;
     pc.keyTolerance = ini.GetFloat(sec, L"KeyTolerance", pc.keyTolerance);
     pc.maxFps = ini.GetInt(sec, L"MaxFps", 30);
+    pc.showCursor = ini.GetBool(sec, L"ShowCursor", false);
     pc.recenterSeq = ini.GetInt(sec, L"RecenterSeq", 0);
     pc.savedAnchor = LoadAnchor(anchors, pc.section);
     cfg.panels.push_back(std::move(pc));

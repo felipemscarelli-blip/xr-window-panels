@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.20)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 # The version lives here only: it reaches the layer (XRWP_VERSION) and the control app (Version.cs).
-project(XRWindowPanels VERSION 0.4.2 LANGUAGES CXX)
+project(XRWindowPanels VERSION 0.5.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

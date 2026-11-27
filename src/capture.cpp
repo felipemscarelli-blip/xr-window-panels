@@ -139,11 +139,12 @@ HWND FindWindowMatch(const std::wstring& titleSubstring, const std::wstring& pro
 // ---------------------------------------------------------------------------
 
 WindowCapture::WindowCapture(ID3D11Device* consumerDevice, std::wstring titleSubstring,
-                             std::wstring processName, int maxFps)
+                             std::wstring processName, int maxFps, bool showCursor)
     : m(std::make_unique<Impl>()),
       m_title(std::move(titleSubstring)),
       m_process(std::move(processName)),
       m_maxFps(maxFps),
+      m_showCursor(showCursor),
       m_consumerDevice(consumerDevice) {
   m_worker = std::jthread([this](std::stop_token st) { WorkerLoop(st); });
 }
@@ -222,7 +223,7 @@ void WindowCapture::WorkerLoop(std::stop_token st) {
         s.pool = wgc::Direct3D11CaptureFramePool::CreateFreeThreaded(m->device, kPixelFormat, 2,
                                                                      s.poolSize);
         s.session = s.pool.CreateCaptureSession(s.item);
-        try { s.session.IsCursorCaptureEnabled(false); } catch (...) {}
+        try { s.session.IsCursorCaptureEnabled(m_showCursor); } catch (...) {}
         try { s.session.IsBorderRequired(false); } catch (...) {}  // yellow border (Win11)
         s.session.StartCapture();
         s.hwnd = h;

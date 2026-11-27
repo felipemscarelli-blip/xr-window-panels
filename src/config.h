@@ -21,6 +21,7 @@ struct PanelConfig {
   std::wstring windowTitle;  // case-insensitive substring of the window title (optional)
   std::wstring processName;  // executable name, e.g. "chrome.exe" (optional)
   bool enabled = true;
+  bool showCursor = false;   // draw the mouse cursor when it is over the window
 
   // Pose relative to the panel's anchor (LOCAL space, or the head pose at the last recenter).
   // Meters: +X right, +Y up, -Z forward. Degrees for yaw/pitch.

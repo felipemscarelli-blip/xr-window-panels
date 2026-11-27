@@ -35,7 +35,7 @@ HWND FindWindowMatch(const std::wstring& titleSubstring, const std::wstring& pro
 class WindowCapture {
  public:
   WindowCapture(ID3D11Device* consumerDevice, std::wstring titleSubstring, std::wstring processName,
-                int maxFps);
+                int maxFps, bool showCursor = false);
   ~WindowCapture();
   WindowCapture(const WindowCapture&) = delete;
   WindowCapture& operator=(const WindowCapture&) = delete;
@@ -70,6 +70,7 @@ class WindowCapture {
   const std::wstring m_title;
   const std::wstring m_process;
   std::atomic<int> m_maxFps;
+  const bool m_showCursor;
 
   Microsoft::WRL::ComPtr<ID3D11Device> m_consumerDevice;
   Microsoft::WRL::ComPtr<ID3D11Device> m_ownDevice;

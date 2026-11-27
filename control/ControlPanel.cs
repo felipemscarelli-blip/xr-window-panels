@@ -61,6 +61,7 @@ namespace XRWindowPanels
         public string Window = "";
         public string Process = "";
         public bool Enabled = true;
+        public bool ShowCursor;
         public float X = 0f, Y = -0.15f, Z = -0.7f, Yaw = 0f, Pitch = 0f, Width = 0.35f;
         public float Opacity = 1f, KeyTolerance = 0.1f;
         public bool UseWindowAlpha, ChromaKey;
@@ -121,7 +122,17 @@ namespace XRWindowPanels
         public void Load()
         {
             Panels.Clear();
-            if (!File.Exists(Path)) return;
+            if (!File.Exists(Path))
+            {
+                // First run: start with the control app itself as a panel, so it can be used from inside VR.
+                Panels.Add(new PanelData
+                {
+                    Section = "Panel1", Window = "XR Window Panels", Process = "XRWindowPanelsControl.exe",
+                    ShowCursor = true, X = 0.4f, Y = -0.1f, Z = -0.6f, Yaw = -30f, Width = 0.4f
+                });
+                Save();
+                return;
+            }
             RecenterAll = ReadI("Control", "RecenterAll", 0);
             ToggleAll = ReadI("Control", "ToggleAll", 0);
             SelectSeq = ReadI("Control", "SelectSeq", 0);
@@ -136,6 +147,7 @@ namespace XRWindowPanels
                 p.Window = Read(sec, "Window", "");
                 p.Process = Read(sec, "Process", "");
                 p.Enabled = ReadB(sec, "Enabled", true);
+                p.ShowCursor = ReadB(sec, "ShowCursor", false);
                 p.X = ReadF(sec, "X", p.X); p.Y = ReadF(sec, "Y", p.Y); p.Z = ReadF(sec, "Z", p.Z);
                 p.Yaw = ReadF(sec, "Yaw", 0); p.Pitch = ReadF(sec, "Pitch", 0);
                 p.Width = ReadF(sec, "Width", p.Width);
@@ -171,6 +183,7 @@ namespace XRWindowPanels
                 sb.AppendLine("Window=" + p.Window);
                 sb.AppendLine("Process=" + p.Process);
                 sb.AppendLine("Enabled=" + (p.Enabled ? 1 : 0));
+                sb.AppendLine("ShowCursor=" + (p.ShowCursor ? 1 : 0));
                 sb.AppendLine("X=" + F(p.X));
                 sb.AppendLine("Y=" + F(p.Y));
                 sb.AppendLine("Z=" + F(p.Z));
@@ -366,7 +379,7 @@ namespace XRWindowPanels
         ListBox _list;
         ComboBox _windows, _step;
         TextBox _title, _process;
-        CheckBox _enabled, _chroma, _alpha, _saveRecenter;
+        CheckBox _enabled, _cursor, _chroma, _alpha, _saveRecenter;
         Label _panelStatus, _pose, _opacityLabel, _game;
         TrackBar _opacity, _tolerance;
         NumericUpDown _fps;
@@ -582,9 +595,11 @@ namespace XRWindowPanels
                 tb.KeyDown += delegate (object s, KeyEventArgs e) { if (e.KeyCode == Keys.Enter) { TargetEdited(); e.SuppressKeyPress = true; } };
             }
             _enabled = Add(gWin, new CheckBox { Text = L.T("Enabled", "Ativo") }, 12, 90, 80, 22);
+            _cursor = Add(gWin, new CheckBox { Text = L.T("Show mouse cursor", "Mostrar cursor do mouse") }, 96, 90, 170, 22);
+            _cursor.CheckedChanged += delegate { Edit(delegate (PanelData p) { p.ShowCursor = _cursor.Checked; }); };
             _enabled.CheckedChanged += delegate { Edit(delegate (PanelData p) { p.Enabled = _enabled.Checked; }); };
-            _panelStatus = AddLabel(gWin, "", 108, 93, 432);
-            _panelControls.AddRange(new Control[] { _windows, _title, _process, _enabled });
+            _panelStatus = AddLabel(gWin, "", 272, 93, 268);
+            _panelControls.AddRange(new Control[] { _windows, _title, _process, _enabled, _cursor });
 
             // Position
             var gPos = Add(this, new GroupBox { Text = L.T("Position (hold a button to repeat)", "Posição (segure o botão para repetir)") }, 196, 134, 552, 236);
@@ -698,6 +713,7 @@ namespace XRWindowPanels
             _title.Text = p.Window;
             _process.Text = p.Process;
             _enabled.Checked = p.Enabled;
+            _cursor.Checked = p.ShowCursor;
             _opacity.Value = Clamp((int)Math.Round(p.Opacity * 100), 10, 100);
             _opacityLabel.Text = _opacity.Value + "%";
             _fps.Value = Clamp(p.MaxFps, 5, 90);
@@ -862,7 +878,7 @@ namespace XRWindowPanels
             string[] names = L.Pt ? new[] { "desativado", "procurando a janela...", "iniciando captura...", "visível", "escondido (Ctrl+F12)" }
                           : new[] { "disabled", "looking for the window...", "starting capture...", "visible", "hidden (Ctrl+F12)" };
             string text = state >= 0 && state < names.Length ? names[state] : "?";
-            if (state >= 3) text += string.Format(L.T("  -  {0}x{1}, {2} updates/s", "  -  {0}x{1}, {2} atualizações/s"), w, h, fps);
+            if (state >= 3) text += string.Format("  -  {0}x{1}, {2}/s", w, h, fps);
             _panelStatus.Text = L.T("In VR: ", "No VR: ") + text;
         }
 

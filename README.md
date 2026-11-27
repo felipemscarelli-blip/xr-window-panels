@@ -22,6 +22,8 @@ To remove it, use **`Uninstall.cmd`**. Your `config.ini` is kept.
 
 - **Panels**: add one panel per window.
 - **Window**: pick the window from the list. It is matched by "Title contains" and "Process". For windows whose title changes (such as Chrome tabs), clear the title and keep only the process.
+- **Show mouse cursor**: draws the mouse cursor when it is over the window. Off by default.
+- **The control app inside VR**: the first panel is the control app itself, already enabled with the cursor on, to your right. Use it to adjust everything without taking the headset off. Keep the app open behind the game (minimized, it goes to the tray and the window disappears).
 - **Position**: these buttons can be held down to repeat.
   - Recenter (this panel) and Recenter all
   - Move ▲◀▶▼

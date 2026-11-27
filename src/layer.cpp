@@ -400,7 +400,7 @@ static void ApplyConfig(SessionState& s, const Config& cfg) {
       }
     }
     if (panel) {
-      if (!pc.SameTarget(panel->cfg) || !pc.enabled) {
+      if (!pc.SameTarget(panel->cfg) || pc.showCursor != panel->cfg.showCursor || !pc.enabled) {
         panel->capture.reset();
         DestroySwapchain(*panel);
       }
@@ -422,7 +422,7 @@ static void ApplyConfig(SessionState& s, const Config& cfg) {
     panel->cfg = pc;
     if (pc.enabled && !panel->capture) {
       panel->capture = std::make_unique<WindowCapture>(s.device.Get(), pc.windowTitle, pc.processName,
-                                                       pc.maxFps);
+                                                       pc.maxFps, pc.showCursor);
     }
     if (panel->capture) panel->capture->SetMaxFps(pc.maxFps);
     if (highlight) {
