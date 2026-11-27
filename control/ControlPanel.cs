@@ -298,7 +298,6 @@ namespace XRWindowPanels
         public static List<WinItem> List()
         {
             var list = new List<WinItem>();
-            uint self = (uint)System.Diagnostics.Process.GetCurrentProcess().Id;
             Native.EnumWindows(delegate (IntPtr h, IntPtr l)
             {
                 if (!Native.IsWindowVisible(h)) return true;
@@ -310,7 +309,6 @@ namespace XRWindowPanels
                 Native.GetWindowText(h, sb, sb.Capacity);
                 uint pid;
                 Native.GetWindowThreadProcessId(h, out pid);
-                if (pid == self) return true;
                 string title = sb.ToString();
                 if (title == "Program Manager") return true;
                 list.Add(new WinItem { Title = title, Process = ProcessName(pid) });
