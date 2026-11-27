@@ -6,6 +6,16 @@
 
 namespace wp {
 
+// Head pose captured at the last recenter, persisted in anchors.ini so panels come back to
+// the same place in the next session. Stored in STAGE space (fixed to the room) when the
+// runtime supports it, otherwise LOCAL.
+struct SavedAnchor {
+  bool valid = false;
+  bool stage = false;
+  float x = 0, y = 0, z = 0;
+  float yaw = 0;  // radians
+};
+
 struct PanelConfig {
   std::wstring section;      // INI section name, e.g. "Panel1"
   std::wstring windowTitle;  // case-insensitive substring of the window title (optional)
@@ -26,6 +36,7 @@ struct PanelConfig {
 
   int maxFps = 30;       // capture updates per second (0 = unlimited)
   int recenterSeq = 0;   // bumped by the control app to recenter this panel
+  SavedAnchor savedAnchor;  // from anchors.ini (written by the layer)
 
   bool SameTarget(const PanelConfig& o) const {
     return windowTitle == o.windowTitle && processName == o.processName;
@@ -46,7 +57,9 @@ struct Config {
   std::wstring selected;
 };
 
-std::wstring ConfigPath();  // <DataDir>\config.ini
+std::wstring ConfigPath();   // <DataDir>\config.ini
+std::wstring AnchorsPath();  // <DataDir>\anchors.ini
+void SaveAnchor(const std::wstring& section, const SavedAnchor& a);  // blocking file IO
 void EnsureDefaultConfig(const std::wstring& path);
 Config LoadConfig(const std::wstring& path);
 

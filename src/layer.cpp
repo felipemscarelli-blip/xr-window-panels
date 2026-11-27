@@ -153,6 +153,15 @@ class ConfigWorker {
     return true;
   }
 
+  // Render thread: queue an anchor to be written to anchors.ini by the worker.
+  void QueueAnchor(const std::wstring& section, const SavedAnchor& a) {
+    {
+      std::lock_guard lock(m_mutex);
+      m_anchorsToSave.emplace_back(section, a);
+    }
+    m_cv.notify_all();
+  }
+
  private:
   void Run(std::stop_token st) {
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
@@ -189,13 +198,25 @@ class ConfigWorker {
         m_hasPending = true;
         first = false;
       }
+
+      std::vector<std::pair<std::wstring, SavedAnchor>> anchors;
+      {
+        std::lock_guard lock(m_mutex);
+        anchors.swap(m_anchorsToSave);
+      }
+      for (auto& [section, a] : anchors) {
+        SaveAnchor(section, a);
+        Log("Saved recenter position for [%s] (%s space)", Narrow(section).c_str(), a.stage ? "stage" : "local");
+      }
+
       std::unique_lock lock(m_mutex);
-      m_cv.wait_for(lock, st, std::chrono::milliseconds(50), [] { return false; });
+      m_cv.wait_for(lock, st, std::chrono::milliseconds(50), [&] { return !m_anchorsToSave.empty(); });
     }
   }
 
   std::mutex m_mutex;
   std::condition_variable_any m_cv;
+  std::vector<std::pair<std::wstring, SavedAnchor>> m_anchorsToSave;
   std::optional<Config> m_pending;
   std::atomic<bool> m_hasPending{false};
   std::jthread m_thread;
@@ -221,6 +242,7 @@ struct Panel {
   bool pendingRecenter = false;
   int64_t highlightUntil = 0;   // QPC time; border shown while selected via the control app
   XrPosef anchor{{0, 0, 0, 1}, {0, 0, 0}};
+  XrSpace anchorSpace = XR_NULL_HANDLE;  // space the anchor is expressed in (null = LOCAL)
 };
 
 struct SessionState {
@@ -232,6 +254,7 @@ struct SessionState {
 
   XrSpace localSpace = XR_NULL_HANDLE;
   XrSpace viewSpace = XR_NULL_HANDLE;
+  XrSpace stageSpace = XR_NULL_HANDLE;  // room-fixed; used for persisted recenter positions
   int64_t format = 0;
   bool srgbFormat = false;
 
@@ -380,7 +403,15 @@ static void ApplyConfig(SessionState& s, const Config& cfg) {
       if (!pc.SameLook(panel->cfg)) panel->needsRedraw = true;
     } else {
       panel = std::make_unique<Panel>();
-      panel->pendingRecenter = !firstLoad;  // panels added while playing appear in front of you
+      const SavedAnchor& sa = pc.savedAnchor;
+      if (sa.valid && (!sa.stage || s.stageSpace != XR_NULL_HANDLE)) {
+        // Restore the position from the last recenter (previous session).
+        panel->anchor = {QuatAxis(0, 1, 0, sa.yaw), {sa.x, sa.y, sa.z}};
+        panel->anchorSpace = sa.stage ? s.stageSpace : s.localSpace;
+        Log("Restored saved position for [%s]", Narrow(pc.section).c_str());
+      } else {
+        panel->pendingRecenter = !firstLoad;  // panels added while playing appear in front of you
+      }
     }
     if (recenterAll) panel->pendingRecenter = true;
     panel->cfg = pc;
@@ -421,10 +452,14 @@ static void ProcessRecenters(SessionState& s, XrTime displayTime) {
   for (auto& p : s.panels) any |= p->pendingRecenter;
   if (!any) return;
 
+  // Prefer STAGE (fixed to the room) so the saved position survives runtime recenters
+  // and new sessions; fall back to LOCAL.
+  const bool useStage = s.stageSpace != XR_NULL_HANDLE;
+  XrSpace base = useStage ? s.stageSpace : s.localSpace;
   XrSpaceLocation loc{XR_TYPE_SPACE_LOCATION};
   const XrSpaceLocationFlags need =
       XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
-  if (XR_FAILED(g_next.LocateSpace(s.viewSpace, s.localSpace, displayTime, &loc)) ||
+  if (XR_FAILED(g_next.LocateSpace(s.viewSpace, base, displayTime, &loc)) ||
       (loc.locationFlags & need) != need) {
     return;  // tracking not ready: retry next frame
   }
@@ -432,10 +467,19 @@ static void ProcessRecenters(SessionState& s, XrTime displayTime) {
   XrVector3f fwd = Rotate(loc.pose.orientation, {0, 0, -1});
   float yaw = std::atan2(-fwd.x, -fwd.z);
   XrPosef anchor{QuatAxis(0, 1, 0, yaw), loc.pose.position};
+  SavedAnchor saved;
+  saved.valid = true;
+  saved.stage = useStage;
+  saved.x = anchor.position.x;
+  saved.y = anchor.position.y;
+  saved.z = anchor.position.z;
+  saved.yaw = yaw;
   for (auto& p : s.panels) {
     if (!p->pendingRecenter) continue;
     p->anchor = anchor;
+    p->anchorSpace = base;
     p->pendingRecenter = false;
+    g_configWorker.QueueAnchor(p->cfg.section, saved);  // file IO happens off this thread
     Log("Recentered [%s]", Narrow(p->cfg.section).c_str());
   }
 }
@@ -529,7 +573,7 @@ static void AppendLayers(SessionState& s) {
     if (!p.capture || !p.hasContent || p.swapchain == XR_NULL_HANDLE) continue;
     XrCompositionLayerQuad q{XR_TYPE_COMPOSITION_LAYER_QUAD};
     q.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;  // premultiplied
-    q.space = s.localSpace;
+    q.space = p.anchorSpace != XR_NULL_HANDLE ? p.anchorSpace : s.localSpace;
     q.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
     q.subImage.swapchain = p.swapchain;
     q.subImage.imageRect = {{0, 0}, {(int32_t)p.scWidth, (int32_t)p.scHeight}};
@@ -547,6 +591,8 @@ static void DestroySessionState(SessionState& s) {
   s.panels.clear();
   if (s.localSpace != XR_NULL_HANDLE) g_next.DestroySpace(s.localSpace);
   if (s.viewSpace != XR_NULL_HANDLE) g_next.DestroySpace(s.viewSpace);
+  if (s.stageSpace != XR_NULL_HANDLE) g_next.DestroySpace(s.stageSpace);
+  s.stageSpace = XR_NULL_HANDLE;
   s.localSpace = s.viewSpace = XR_NULL_HANDLE;
 }
 
@@ -574,6 +620,11 @@ static bool InitSessionState(SessionState& s, ID3D11Device* device) {
   if (XR_FAILED(g_next.CreateReferenceSpace(s.handle, &rs, &s.localSpace))) return false;
   rs.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
   if (XR_FAILED(g_next.CreateReferenceSpace(s.handle, &rs, &s.viewSpace))) return false;
+  rs.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;  // optional: not every runtime has it
+  if (XR_FAILED(g_next.CreateReferenceSpace(s.handle, &rs, &s.stageSpace))) {
+    s.stageSpace = XR_NULL_HANDLE;
+    Log("STAGE space not available - saved positions use LOCAL space");
+  }
 
   uint32_t n = 0;
   g_next.EnumerateSwapchainFormats(s.handle, 0, &n, nullptr);

@@ -35,6 +35,13 @@ Para remover, use **`Desinstalar.cmd`**. O `config.ini` é mantido.
 
 As mudanças aparecem no VR na hora. Ficam salvas em `%LOCALAPPDATA%\XRWindowPanels\config.ini`.
 
+- **Posição recentralizada é guardada**: ao recentralizar um painel, a camada salva essa posição em `anchors.ini` e a restaura na próxima vez que você abrir o jogo.
+  - A posição fica no espaço STAGE do runtime, que é fixo na sala. Assim o painel volta ao mesmo lugar do cockpit mesmo que o runtime recentralize a visão.
+  - Se o runtime não tiver STAGE, a camada usa o espaço LOCAL.
+  - Se você refizer a configuração da sala no headset, recentralize de novo.
+- **Iniciar com o Windows**: marque a opção no rodapé do app. Ele passa a abrir junto com o Windows, já minimizado na bandeja, para os atalhos funcionarem desde o começo.
+  - Abrir o app de novo (pelo atalho) traz a janela que já está aberta, sem abrir uma segunda cópia.
+
 ## Atalhos no jogo
 
 Atalhos fixos da camada (funcionam mesmo sem o app aberto):
@@ -92,5 +99,4 @@ capture_test "Google Chrome" saida.bmp
 ## Limitações
 
 - Funciona só com jogos em Direct3D 11.
-- A recentralização vale enquanto o jogo está aberto. Ao reabrir, a posição volta a ser relativa ao centro do runtime.
 - Não dá para interagir com o painel usando os controles de VR.

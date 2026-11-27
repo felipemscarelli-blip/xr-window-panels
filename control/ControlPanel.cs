@@ -360,6 +360,18 @@ namespace XRWindowPanels
         InputPoller _poller;
         NotifyIcon _tray;
         bool _trayHintShown;
+        bool _startHidden;  // started by Windows (--tray): stay in the tray until opened
+
+        protected override void SetVisibleCore(bool value)
+        {
+            if (_startHidden)
+            {
+                _startHidden = false;
+                if (!IsHandleCreated) CreateHandle();
+                value = false;
+            }
+            base.SetVisibleCore(value);
+        }
 
         PanelData Current { get { return _list.SelectedItem as PanelData; } }
 
@@ -384,8 +396,12 @@ namespace XRWindowPanels
             get { return _step.SelectedIndex == 0 ? 0.25f : (_step.SelectedIndex == 2 ? 4f : 1f); }
         }
 
-        public MainForm()
+        public MainForm() : this(false) { }
+
+        public MainForm(bool startInTray)
         {
+            _startHidden = startInTray;
+            _trayHintShown = startInTray;  // no balloon when Windows starts us
             Text = "XR Window Panels";
             Icon = AppIcon;
             Font = new Font("Segoe UI", 9f);
@@ -491,7 +507,7 @@ namespace XRWindowPanels
             Save();
         }
 
-        void RestoreFromTray()
+        public void RestoreFromTray()
         {
             Show();
             WindowState = FormWindowState.Normal;
@@ -616,8 +632,16 @@ namespace XRWindowPanels
             _panelControls.AddRange(new Control[] { _opacity, _fps, _chroma, _color, _tolerance, _alpha });
 
             // Footer
-            _game = AddLabel(this, "", 12, 516, 736);
+            _game = AddLabel(this, "", 12, 516, 556);
             _game.Height = 20;
+            var autostart = Add(this, new CheckBox { Text = "Iniciar com o Windows", Checked = AutoStart.Enabled }, 580, 513, 168, 24);
+            new ToolTip().SetToolTip(autostart, "Abre o app minimizado na bandeja ao entrar no Windows, para os atalhos já funcionarem.");
+            autostart.CheckedChanged += delegate
+            {
+                try { AutoStart.Enabled = autostart.Checked; }
+                catch (Exception ex) { _game.Text = "Erro: " + ex.Message; }
+            };
+            try { AutoStart.Refresh(); } catch (Exception) { }
         }
 
         // ---------------- Data <-> UI
@@ -799,12 +823,70 @@ namespace XRWindowPanels
     static class Program
     {
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
-            try { Native.SetProcessDPIAware(); } catch (Exception) { }
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new MainForm());
+            // One instance only (autostart + double-click would otherwise run two pollers).
+            bool created;
+            using (var mutex = new Mutex(true, "Local\\XRWindowPanelsControl", out created))
+            using (var showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, "Local\\XRWindowPanelsControl_Show"))
+            {
+                if (!created)
+                {
+                    showEvent.Set();  // ask the running instance to come to the front
+                    return;
+                }
+                try { Native.SetProcessDPIAware(); } catch (Exception) { }
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                bool tray = Array.IndexOf(args, AutoStart.TrayArg) >= 0;
+                var form = new MainForm(tray);
+                var listener = new Thread(delegate ()
+                {
+                    while (showEvent.WaitOne())
+                    {
+                        try { form.BeginInvoke((MethodInvoker)delegate { form.RestoreFromTray(); }); }
+                        catch (Exception) { return; }  // form closed
+                    }
+                });
+                listener.IsBackground = true;
+                listener.Start();
+                Application.Run(form);
+            }
+        }
+    }
+
+    // "Iniciar com o Windows": HKCU Run entry that starts the app minimized to the tray.
+    static class AutoStart
+    {
+        public const string TrayArg = "--tray";
+        const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
+        const string ValueName = "XRWindowPanels";
+
+        static string Command { get { return "\"" + Application.ExecutablePath + "\" " + TrayArg; } }
+
+        public static bool Enabled
+        {
+            get
+            {
+                using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(RunKey))
+                    return k != null && k.GetValue(ValueName) != null;
+            }
+            set
+            {
+                using (var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(RunKey))
+                {
+                    if (value) k.SetValue(ValueName, Command);
+                    else k.DeleteValue(ValueName, false);
+                }
+            }
+        }
+
+        // Keep the entry pointing at this exe if the app was moved/reinstalled.
+        public static void Refresh()
+        {
+            if (!Enabled) return;
+            using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(RunKey, true))
+                if (k != null && (k.GetValue(ValueName) as string) != Command) k.SetValue(ValueName, Command);
         }
     }
 }

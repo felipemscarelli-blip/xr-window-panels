@@ -62,6 +62,37 @@ static std::wstring ReadStr(const std::wstring& file, const wchar_t* sec, const 
   return buf;
 }
 
+std::wstring AnchorsPath() { return DataDir() + L"\\anchors.ini"; }
+
+void SaveAnchor(const std::wstring& section, const SavedAnchor& a) {
+  const std::wstring path = AnchorsPath();
+  wchar_t buf[64];
+  auto put = [&](const wchar_t* key, float v) {
+    swprintf_s(buf, L"%.4f", v);
+    WritePrivateProfileStringW(section.c_str(), key, buf, path.c_str());
+  };
+  WritePrivateProfileStringW(section.c_str(), L"Space", a.stage ? L"stage" : L"local", path.c_str());
+  put(L"X", a.x);
+  put(L"Y", a.y);
+  put(L"Z", a.z);
+  put(L"Yaw", a.yaw);
+}
+
+static SavedAnchor LoadAnchor(const std::wstring& section) {
+  const std::wstring path = AnchorsPath();
+  SavedAnchor a;
+  std::wstring space = ReadStr(path, section.c_str(), L"Space");
+  if (space.empty()) return a;
+  auto get = [&](const wchar_t* key) { return (float)_wtof(ReadStr(path, section.c_str(), key, L"0").c_str()); };
+  a.valid = true;
+  a.stage = space == L"stage";
+  a.x = get(L"X");
+  a.y = get(L"Y");
+  a.z = get(L"Z");
+  a.yaw = get(L"Yaw");
+  return a;
+}
+
 static float ReadFloat(const std::wstring& file, const wchar_t* sec, const wchar_t* key,
                        float def) {
   std::wstring s = ReadStr(file, sec, key);
@@ -114,6 +145,7 @@ Config LoadConfig(const std::wstring& path) {
     pc.keyTolerance = ReadFloat(path, sec, L"KeyTolerance", pc.keyTolerance);
     pc.maxFps = GetPrivateProfileIntW(sec, L"MaxFps", 30, path.c_str());
     pc.recenterSeq = GetPrivateProfileIntW(sec, L"RecenterSeq", 0, path.c_str());
+    pc.savedAnchor = LoadAnchor(pc.section);
     cfg.panels.push_back(std::move(pc));
   }
   return cfg;

@@ -57,6 +57,11 @@ int wmain(int argc, wchar_t** argv) {
              Narrow(p.section).c_str(), Narrow(p.windowTitle).c_str(), Narrow(p.processName).c_str(),
              p.enabled, p.x, p.y, p.z, p.yawDeg, p.pitchDeg, p.widthM, p.opacity, p.chromaKey,
              p.keyColor[0], p.keyColor[1], p.keyColor[2], p.keyTolerance, p.maxFps, p.recenterSeq);
+      if (p.savedAnchor.valid) {
+        printf("      saved recenter: %s space, pos=(%.3f %.3f %.3f) yaw=%.3f rad\n",
+               p.savedAnchor.stage ? "stage" : "local", p.savedAnchor.x, p.savedAnchor.y,
+               p.savedAnchor.z, p.savedAnchor.yaw);
+      }
     }
     return 0;
   }
