@@ -1,0 +1,15 @@
+# Build output
+build/
+out/
+dist/
+*.zip
+
+# Personal configuration / logs
+config.ini
+*.log
+*.bmp
+
+# Editors
+.vs/
+.vscode/
+*.user

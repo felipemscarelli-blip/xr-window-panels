@@ -1,0 +1,54 @@
+cmake_minimum_required(VERSION 3.20)
+
+# Static CRT so the DLL does not depend on the VC++ runtime inside the game process.
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
+project(XRWindowPanels LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+include(FetchContent)
+# Only the OpenXR headers are needed; SOURCE_SUBDIR points at a folder without a
+# CMakeLists.txt so the SDK (loader, samples) is downloaded but not built.
+FetchContent_Declare(openxr
+  GIT_REPOSITORY https://github.com/KhronosGroup/OpenXR-SDK.git
+  GIT_TAG        release-1.1.38
+  GIT_SHALLOW    TRUE
+  SOURCE_SUBDIR  headers-only-do-not-build)
+FetchContent_MakeAvailable(openxr)
+
+# Shared code: window capture, blitter, config, logging
+add_library(wp_core STATIC
+  src/capture.cpp
+  src/blitter.cpp
+  src/config.cpp
+  src/log.cpp)
+target_include_directories(wp_core PUBLIC src)
+target_compile_definitions(wp_core PUBLIC UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_compile_options(wp_core PUBLIC /EHsc /bigobj /permissive- /utf-8 /W3)
+target_link_libraries(wp_core PUBLIC d3d11 dxgi d3dcompiler dwmapi windowsapp shell32 ole32)
+
+# The OpenXR API layer
+add_library(XRWindowPanels SHARED src/layer.cpp)
+target_include_directories(XRWindowPanels PRIVATE ${openxr_SOURCE_DIR}/include)
+target_link_libraries(XRWindowPanels PRIVATE wp_core)
+add_custom_command(TARGET XRWindowPanels POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          ${CMAKE_SOURCE_DIR}/manifest/XR_APILAYER_NOVENDOR_window_panels.json
+          $<TARGET_FILE_DIR:XRWindowPanels>)
+
+# Desktop test tool: captures a window through the same code path and saves a BMP
+add_executable(capture_test tools/capture_test.cpp)
+target_link_libraries(capture_test PRIVATE wp_core)
+
+# Control app (C# WinForms, built with the csc.exe that ships with .NET Framework 4.x)
+set(CSC "$ENV{WINDIR}/Microsoft.NET/Framework64/v4.0.30319/csc.exe")
+add_custom_target(control_app ALL
+  COMMAND "${CSC}" /nologo /codepage:65001 /target:winexe /optimize+
+          "/out:$<TARGET_FILE_DIR:XRWindowPanels>/XRWindowPanelsControl.exe"
+          /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Core.dll
+          control\\ControlPanel.cs
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  DEPENDS XRWindowPanels
+  SOURCES control/ControlPanel.cs)
