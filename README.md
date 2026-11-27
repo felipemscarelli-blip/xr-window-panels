@@ -102,3 +102,9 @@ capture_test "Google Chrome" output.bmp
 
 - Direct3D 11 games only.
 - You can't interact with the panels using VR controllers.
+
+## Support
+
+XR Window Panels is free and open source. If it helps your racing and you'd like to support the project, any help is appreciated:
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/felipescarelli)

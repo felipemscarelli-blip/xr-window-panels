@@ -102,3 +102,9 @@ capture_test "Google Chrome" saida.bmp
 
 - Funciona só com jogos em Direct3D 11.
 - Não dá para interagir com o painel usando os controles de VR.
+
+## Apoie
+
+O XR Window Panels é gratuito e de código aberto. Se ele ajuda nas suas corridas e você quiser apoiar o projeto, qualquer ajuda é bem-vinda:
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/felipescarelli)
