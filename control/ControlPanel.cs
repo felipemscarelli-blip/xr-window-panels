@@ -66,6 +66,7 @@ namespace XRWindowPanels
         public readonly string Path;
         public readonly List<PanelData> Panels = new List<PanelData>();
         public int RecenterAll, ToggleAll, SelectSeq;
+        public bool SaveRecenter;  // remember recenter positions across game sessions
         public string Selected;  // section highlighted in VR after SelectSeq changes
 
         public ConfigFile()
@@ -108,6 +109,7 @@ namespace XRWindowPanels
             RecenterAll = ReadI("Control", "RecenterAll", 0);
             ToggleAll = ReadI("Control", "ToggleAll", 0);
             SelectSeq = ReadI("Control", "SelectSeq", 0);
+            SaveRecenter = ReadB("Control", "SaveRecenter", false);
             var buf = new char[32768];
             int n = Native.GetPrivateProfileSectionNames(buf, buf.Length, Path);
             foreach (string sec in new string(buf, 0, n).Split(new[] { '\0' }, StringSplitOptions.RemoveEmptyEntries))
@@ -145,6 +147,7 @@ namespace XRWindowPanels
             sb.AppendLine("ToggleAll=" + ToggleAll);
             sb.AppendLine("SelectSeq=" + SelectSeq);
             sb.AppendLine("Selected=" + (Selected ?? ""));
+            sb.AppendLine("SaveRecenter=" + (SaveRecenter ? 1 : 0));
             foreach (var p in Panels)
             {
                 sb.AppendLine();
@@ -349,7 +352,7 @@ namespace XRWindowPanels
         ListBox _list;
         ComboBox _windows, _step;
         TextBox _title, _process;
-        CheckBox _enabled, _chroma, _alpha;
+        CheckBox _enabled, _chroma, _alpha, _saveRecenter;
         Label _panelStatus, _pose, _opacityLabel, _game;
         TrackBar _opacity, _tolerance;
         NumericUpDown _fps;
@@ -413,6 +416,9 @@ namespace XRWindowPanels
 
             BuildUi();
             _cfg.Load();
+            _loading = true;
+            _saveRecenter.Checked = _cfg.SaveRecenter;
+            _loading = false;
             RefreshPanelList(null);
             RefreshWindows();
 
@@ -602,8 +608,18 @@ namespace XRWindowPanels
             AddStep(gPos, "turnRight", "▶", 470, 114, 40, delegate (PanelData p, float k) { p.Yaw += tilt * k; });
             AddStep(gPos, "tiltDown", "▼", 428, 146, 40, delegate (PanelData p, float k) { p.Pitch += tilt * k; });
 
-            _pose = AddLabel(gPos, "", 12, 196, 528);
+            _pose = AddLabel(gPos, "", 12, 184, 528);
             _pose.ForeColor = SystemColors.GrayText;
+            _saveRecenter = Add(gPos, new CheckBox { Text = "Lembrar posição recentralizada na próxima vez que abrir o jogo" }, 12, 204, 528, 24);
+            new ToolTip().SetToolTip(_saveRecenter,
+                "Ligado: ao recentralizar, a posição é salva e os painéis voltam ao mesmo lugar na próxima sessão.\n" +
+                "Desligado: a recentralização vale só enquanto o jogo estiver aberto.");
+            _saveRecenter.CheckedChanged += delegate
+            {
+                if (_loading) return;
+                _cfg.SaveRecenter = _saveRecenter.Checked;
+                Save();
+            };
 
             // Appearance
             var gLook = Add(this, new GroupBox { Text = "Aparência e desempenho" }, 196, 374, 552, 130);

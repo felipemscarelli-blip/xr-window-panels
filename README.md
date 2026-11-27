@@ -35,7 +35,7 @@ Para remover, use **`Desinstalar.cmd`**. O `config.ini` é mantido.
 
 As mudanças aparecem no VR na hora. Ficam salvas em `%LOCALAPPDATA%\XRWindowPanels\config.ini`.
 
-- **Posição recentralizada é guardada**: ao recentralizar um painel, a camada salva essa posição em `anchors.ini` e a restaura na próxima vez que você abrir o jogo.
+- **Lembrar posição recentralizada** (opção no grupo Posição, desligada por padrão): com ela ligada, ao recentralizar um painel, a camada salva essa posição em `anchors.ini` e a restaura na próxima vez que você abrir o jogo. Desligada, a recentralização vale só enquanto o jogo estiver aberto.
   - A posição fica no espaço STAGE do runtime, que é fixo na sala. Assim o painel volta ao mesmo lugar do cockpit mesmo que o runtime recentralize a visão.
   - Se o runtime não tiver STAGE, a camada usa o espaço LOCAL.
   - Se você refizer a configuração da sala no headset, recentralize de novo.

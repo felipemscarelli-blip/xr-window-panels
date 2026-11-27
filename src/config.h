@@ -55,6 +55,7 @@ struct Config {
   int toggleAllSeq = 0;    // ToggleAll: show/hide all panels
   int selectSeq = 0;       // SelectSeq + Selected: briefly highlight the selected panel
   std::wstring selected;
+  bool saveRecenter = false;  // SaveRecenter: persist recenter positions across sessions
 };
 
 std::wstring ConfigPath();   // <DataDir>\config.ini

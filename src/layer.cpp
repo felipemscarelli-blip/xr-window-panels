@@ -262,6 +262,7 @@ struct SessionState {
   int recenterAllSeq = 0;
   int toggleAllSeq = 0;
   int selectSeq = 0;
+  bool saveRecenter = false;
   std::vector<std::unique_ptr<Panel>> panels;
   std::vector<XrCompositionLayerQuad> quads;
   std::vector<const XrCompositionLayerBaseHeader*> layers;  // reused every frame
@@ -380,6 +381,7 @@ static void ApplyConfig(SessionState& s, const Config& cfg) {
     Log("Panels %s (control app)", s.visible ? "shown" : "hidden");
   }
   s.toggleAllSeq = cfg.toggleAllSeq;
+  s.saveRecenter = cfg.saveRecenter;
   const bool highlight = !firstLoad && cfg.selectSeq != s.selectSeq;
   s.selectSeq = cfg.selectSeq;
   s.configLoaded = true;
@@ -404,7 +406,7 @@ static void ApplyConfig(SessionState& s, const Config& cfg) {
     } else {
       panel = std::make_unique<Panel>();
       const SavedAnchor& sa = pc.savedAnchor;
-      if (sa.valid && (!sa.stage || s.stageSpace != XR_NULL_HANDLE)) {
+      if (cfg.saveRecenter && sa.valid && (!sa.stage || s.stageSpace != XR_NULL_HANDLE)) {
         // Restore the position from the last recenter (previous session).
         panel->anchor = {QuatAxis(0, 1, 0, sa.yaw), {sa.x, sa.y, sa.z}};
         panel->anchorSpace = sa.stage ? s.stageSpace : s.localSpace;
@@ -479,7 +481,7 @@ static void ProcessRecenters(SessionState& s, XrTime displayTime) {
     p->anchor = anchor;
     p->anchorSpace = base;
     p->pendingRecenter = false;
-    g_configWorker.QueueAnchor(p->cfg.section, saved);  // file IO happens off this thread
+    if (s.saveRecenter) g_configWorker.QueueAnchor(p->cfg.section, saved);  // file IO off this thread
     Log("Recentered [%s]", Narrow(p->cfg.section).c_str());
   }
 }
