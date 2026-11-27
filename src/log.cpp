@@ -16,6 +16,13 @@ static bool g_console = false;
 
 std::wstring DataDir() {
   static const std::wstring dir = [] {
+    // Optional override (tests / portable setups).
+    wchar_t custom[MAX_PATH];
+    DWORD n = GetEnvironmentVariableW(L"XRWP_DATA_DIR", custom, MAX_PATH);
+    if (n > 0 && n < MAX_PATH) {
+      CreateDirectoryW(custom, nullptr);
+      return std::wstring(custom);
+    }
     std::wstring d = L".";
     PWSTR p = nullptr;
     if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &p))) {

@@ -3,6 +3,8 @@
 #include "log.h"
 
 #include <cwchar>
+#include <cwctype>
+#include <unordered_map>
 
 namespace wp {
 
@@ -55,12 +57,134 @@ void EnsureDefaultConfig(const std::wstring& path) {
   Log("Created default config at %s", Narrow(path).c_str());
 }
 
-static std::wstring ReadStr(const std::wstring& file, const wchar_t* sec, const wchar_t* key,
-                            const wchar_t* def = L"") {
-  wchar_t buf[1024];
-  GetPrivateProfileStringW(sec, key, def, buf, 1024, file.c_str());
-  return buf;
-}
+// ---------------------------------------------------------------------------
+// In-memory INI snapshot.
+//
+// The control app replaces config.ini many times per second while a slider is dragged.
+// GetPrivateProfileString reopens the file for every key, so a read that overlaps a replace
+// could see a missing file (no panels -> panels destroyed and recreated) or a mix of old and
+// new values. Reading the whole file with one open gives an atomic snapshot; if the open
+// fails, the caller keeps the previous config.
+
+class Ini {
+ public:
+  bool Load(const std::wstring& path) {
+    std::string bytes;
+    if (!ReadAll(path, bytes)) return false;
+    Parse(Decode(bytes));
+    return true;
+  }
+
+  std::wstring Get(const std::wstring& sec, const wchar_t* key, const wchar_t* def = L"") const {
+    auto s = m_data.find(Lower(sec));
+    if (s == m_data.end()) return def;
+    auto k = s->second.find(Lower(key));
+    return k == s->second.end() ? std::wstring(def) : k->second;
+  }
+  int GetInt(const std::wstring& sec, const wchar_t* key, int def) const {
+    std::wstring v = Get(sec, key);
+    return v.empty() ? def : _wtoi(v.c_str());
+  }
+  float GetFloat(const std::wstring& sec, const wchar_t* key, float def) const {
+    std::wstring v = Get(sec, key);
+    if (v.empty()) return def;
+    for (auto& c : v) {
+      if (c == L',') c = L'.';  // accept "0,5" as well as "0.5"
+    }
+    return wcstof(v.c_str(), nullptr);
+  }
+  bool GetBool(const std::wstring& sec, const wchar_t* key, bool def) const {
+    std::wstring v = Get(sec, key);
+    if (v.empty()) return def;
+    wchar_t c = (wchar_t)towlower(v[0]);
+    return c == L'1' || c == L't' || c == L's';
+  }
+  const std::vector<std::wstring>& Sections() const { return m_sections; }
+
+ private:
+  static std::wstring Lower(std::wstring s) {
+    for (auto& c : s) c = (wchar_t)towlower(c);
+    return s;
+  }
+  static std::wstring Trim(const std::wstring& s) {
+    size_t a = s.find_first_not_of(L" \t\r\n");
+    if (a == std::wstring::npos) return {};
+    size_t b = s.find_last_not_of(L" \t\r\n");
+    return s.substr(a, b - a + 1);
+  }
+
+  static bool ReadAll(const std::wstring& path, std::string& out) {
+    for (int attempt = 0; attempt < 5; ++attempt) {
+      // FILE_SHARE_DELETE so the control app can still replace the file while we read.
+      HANDLE f = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                             nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+      if (f != INVALID_HANDLE_VALUE) {
+        LARGE_INTEGER size{};
+        bool ok = GetFileSizeEx(f, &size) && size.QuadPart < (16 << 20);
+        if (ok) {
+          out.resize((size_t)size.QuadPart);
+          DWORD read = 0;
+          ok = out.empty() || (ReadFile(f, out.data(), (DWORD)out.size(), &read, nullptr) && read == out.size());
+        }
+        CloseHandle(f);
+        if (ok) return true;
+      }
+      DWORD err = GetLastError();
+      if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND) {
+        if (attempt >= 2) return false;  // may be mid-replace: retry briefly, then give up
+      }
+      Sleep(10);
+    }
+    return false;
+  }
+
+  static std::wstring Decode(const std::string& b) {
+    if (b.size() >= 2 && (unsigned char)b[0] == 0xFF && (unsigned char)b[1] == 0xFE) {  // UTF-16LE
+      return std::wstring(reinterpret_cast<const wchar_t*>(b.data() + 2), (b.size() - 2) / 2);
+    }
+    size_t start = (b.size() >= 3 && (unsigned char)b[0] == 0xEF && (unsigned char)b[1] == 0xBB &&
+                    (unsigned char)b[2] == 0xBF) ? 3 : 0;
+    const char* src = b.data() + start;
+    int len = (int)(b.size() - start);
+    if (len <= 0) return {};
+    UINT cp = CP_UTF8;
+    int n = MultiByteToWideChar(cp, MB_ERR_INVALID_CHARS, src, len, nullptr, 0);
+    if (n == 0) {  // not valid UTF-8: Notepad "ANSI"
+      cp = CP_ACP;
+      n = MultiByteToWideChar(cp, 0, src, len, nullptr, 0);
+    }
+    std::wstring w(n, L'\0');
+    MultiByteToWideChar(cp, 0, src, len, w.data(), n);
+    return w;
+  }
+
+  void Parse(const std::wstring& text) {
+    std::wstring section;
+    size_t pos = 0;
+    while (pos <= text.size()) {
+      size_t eol = text.find(L'\n', pos);
+      if (eol == std::wstring::npos) eol = text.size();
+      std::wstring line = Trim(text.substr(pos, eol - pos));
+      pos = eol + 1;
+      if (line.empty() || line[0] == L';' || line[0] == L'#') continue;
+      if (line[0] == L'[') {
+        size_t close = line.find(L']');
+        section = Trim(line.substr(1, close == std::wstring::npos ? std::wstring::npos : close - 1));
+        if (m_data.find(Lower(section)) == m_data.end()) m_sections.push_back(section);
+        m_data[Lower(section)];
+        continue;
+      }
+      size_t eq = line.find(L'=');
+      if (eq == std::wstring::npos || section.empty()) continue;
+      m_data[Lower(section)][Lower(Trim(line.substr(0, eq)))] = Trim(line.substr(eq + 1));
+    }
+  }
+
+  std::unordered_map<std::wstring, std::unordered_map<std::wstring, std::wstring>> m_data;
+  std::vector<std::wstring> m_sections;
+};
+
+// ---------------------------------------------------------------------------
 
 std::wstring AnchorsPath() { return DataDir() + L"\\anchors.ini"; }
 
@@ -78,78 +202,62 @@ void SaveAnchor(const std::wstring& section, const SavedAnchor& a) {
   put(L"Yaw", a.yaw);
 }
 
-static SavedAnchor LoadAnchor(const std::wstring& section) {
-  const std::wstring path = AnchorsPath();
+static SavedAnchor LoadAnchor(const Ini& anchors, const std::wstring& section) {
   SavedAnchor a;
-  std::wstring space = ReadStr(path, section.c_str(), L"Space");
+  std::wstring space = anchors.Get(section, L"Space");
   if (space.empty()) return a;
-  auto get = [&](const wchar_t* key) { return (float)_wtof(ReadStr(path, section.c_str(), key, L"0").c_str()); };
   a.valid = true;
   a.stage = space == L"stage";
-  a.x = get(L"X");
-  a.y = get(L"Y");
-  a.z = get(L"Z");
-  a.yaw = get(L"Yaw");
+  a.x = anchors.GetFloat(section, L"X", 0);
+  a.y = anchors.GetFloat(section, L"Y", 0);
+  a.z = anchors.GetFloat(section, L"Z", 0);
+  a.yaw = anchors.GetFloat(section, L"Yaw", 0);
   return a;
 }
 
-static float ReadFloat(const std::wstring& file, const wchar_t* sec, const wchar_t* key,
-                       float def) {
-  std::wstring s = ReadStr(file, sec, key);
-  if (s.empty()) return def;
-  for (auto& c : s) {
-    if (c == L',') c = L'.';  // accept "0,5" as well as "0.5"
-  }
-  return wcstof(s.c_str(), nullptr);
-}
+bool LoadConfig(const std::wstring& path, Config& cfg) {
+  Ini ini;
+  if (!ini.Load(path)) return false;  // keep the previous config
+  Ini anchors;
+  anchors.Load(AnchorsPath());  // optional file
 
-static bool ReadBool(const std::wstring& file, const wchar_t* sec, const wchar_t* key, bool def) {
-  std::wstring s = ReadStr(file, sec, key);
-  if (s.empty()) return def;
-  return s[0] == L'1' || s[0] == L't' || s[0] == L'T' || s[0] == L's' || s[0] == L'S';
-}
+  cfg = Config{};
+  cfg.recenterAllSeq = ini.GetInt(L"Control", L"RecenterAll", 0);
+  cfg.toggleAllSeq = ini.GetInt(L"Control", L"ToggleAll", 0);
+  cfg.selectSeq = ini.GetInt(L"Control", L"SelectSeq", 0);
+  cfg.selected = ini.Get(L"Control", L"Selected");
+  cfg.saveRecenter = ini.GetBool(L"Control", L"SaveRecenter", false);
 
-Config LoadConfig(const std::wstring& path) {
-  Config cfg;
-  cfg.recenterAllSeq = GetPrivateProfileIntW(L"Control", L"RecenterAll", 0, path.c_str());
-  cfg.toggleAllSeq = GetPrivateProfileIntW(L"Control", L"ToggleAll", 0, path.c_str());
-  cfg.selectSeq = GetPrivateProfileIntW(L"Control", L"SelectSeq", 0, path.c_str());
-  cfg.selected = ReadStr(path, L"Control", L"Selected");
-  cfg.saveRecenter = GetPrivateProfileIntW(L"Control", L"SaveRecenter", 0, path.c_str()) != 0;
-
-  std::wstring names(32768, L'\0');
-  DWORD n = GetPrivateProfileSectionNamesW(names.data(), (DWORD)names.size(), path.c_str());
-  for (const wchar_t* p = names.c_str(); p < names.c_str() + n && *p; p += wcslen(p) + 1) {
-    if (_wcsnicmp(p, L"Panel", 5) != 0) continue;
-    const wchar_t* sec = p;
+  for (const auto& sec : ini.Sections()) {
+    if (_wcsnicmp(sec.c_str(), L"Panel", 5) != 0) continue;
     PanelConfig pc;
     pc.section = sec;
-    pc.windowTitle = ReadStr(path, sec, L"Window");
-    pc.processName = ReadStr(path, sec, L"Process");
+    pc.windowTitle = ini.Get(sec, L"Window");
+    pc.processName = ini.Get(sec, L"Process");
     if (pc.windowTitle.empty() && pc.processName.empty()) continue;
-    pc.enabled = ReadBool(path, sec, L"Enabled", true);
-    pc.x = ReadFloat(path, sec, L"X", pc.x);
-    pc.y = ReadFloat(path, sec, L"Y", pc.y);
-    pc.z = ReadFloat(path, sec, L"Z", pc.z);
-    pc.yawDeg = ReadFloat(path, sec, L"Yaw", pc.yawDeg);
-    pc.pitchDeg = ReadFloat(path, sec, L"Pitch", pc.pitchDeg);
-    pc.widthM = ReadFloat(path, sec, L"Width", pc.widthM);
+    pc.enabled = ini.GetBool(sec, L"Enabled", true);
+    pc.x = ini.GetFloat(sec, L"X", pc.x);
+    pc.y = ini.GetFloat(sec, L"Y", pc.y);
+    pc.z = ini.GetFloat(sec, L"Z", pc.z);
+    pc.yawDeg = ini.GetFloat(sec, L"Yaw", pc.yawDeg);
+    pc.pitchDeg = ini.GetFloat(sec, L"Pitch", pc.pitchDeg);
+    pc.widthM = ini.GetFloat(sec, L"Width", pc.widthM);
     if (pc.widthM < 0.02f) pc.widthM = 0.02f;
-    pc.opacity = ReadFloat(path, sec, L"Opacity", pc.opacity);
-    pc.useWindowAlpha = ReadBool(path, sec, L"UseWindowAlpha", false);
-    pc.chromaKey = ReadBool(path, sec, L"ChromaKey", false);
-    std::wstring key = ReadStr(path, sec, L"KeyColor", L"#000000");
+    pc.opacity = ini.GetFloat(sec, L"Opacity", pc.opacity);
+    pc.useWindowAlpha = ini.GetBool(sec, L"UseWindowAlpha", false);
+    pc.chromaKey = ini.GetBool(sec, L"ChromaKey", false);
+    std::wstring key = ini.Get(sec, L"KeyColor", L"#000000");
     unsigned long rgb = wcstoul(key.c_str() + (key.size() && key[0] == L'#' ? 1 : 0), nullptr, 16);
     pc.keyColor[0] = ((rgb >> 16) & 0xFF) / 255.0f;
     pc.keyColor[1] = ((rgb >> 8) & 0xFF) / 255.0f;
     pc.keyColor[2] = (rgb & 0xFF) / 255.0f;
-    pc.keyTolerance = ReadFloat(path, sec, L"KeyTolerance", pc.keyTolerance);
-    pc.maxFps = GetPrivateProfileIntW(sec, L"MaxFps", 30, path.c_str());
-    pc.recenterSeq = GetPrivateProfileIntW(sec, L"RecenterSeq", 0, path.c_str());
-    pc.savedAnchor = LoadAnchor(pc.section);
+    pc.keyTolerance = ini.GetFloat(sec, L"KeyTolerance", pc.keyTolerance);
+    pc.maxFps = ini.GetInt(sec, L"MaxFps", 30);
+    pc.recenterSeq = ini.GetInt(sec, L"RecenterSeq", 0);
+    pc.savedAnchor = LoadAnchor(anchors, pc.section);
     cfg.panels.push_back(std::move(pc));
   }
-  return cfg;
+  return true;
 }
 
 }  // namespace wp

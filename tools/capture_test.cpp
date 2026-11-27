@@ -47,8 +47,51 @@ int wmain(int argc, wchar_t** argv) {
   SetConsoleOutputCP(CP_UTF8);
   LogInit(L"capture_test.log", true);
 
+  if (argc >= 3 && std::wstring(argv[1]) == L"--stress") {
+    // Reads config.ini in a tight loop while another process rewrites it, comparing the old
+    // key-by-key INI API with the snapshot parser. Positions are expected to stay constant.
+    const int n = _wtoi(argv[2]);
+    const std::wstring path = ConfigPath();
+    Config ref;
+    LoadConfig(path, ref);
+    int oldBad = 0, newBad = 0, newSkipped = 0;
+    for (int i = 0; i < n; ++i) {
+      // Old method: section list + one key, each call reopens the file.
+      wchar_t names[4096];
+      DWORD len = GetPrivateProfileSectionNamesW(names, 4096, path.c_str());
+      int count = 0;
+      for (const wchar_t* p = names; p < names + len && *p; p += wcslen(p) + 1) count += _wcsnicmp(p, L"Panel", 5) == 0;
+      wchar_t z[64] = L"";
+      GetPrivateProfileStringW(L"Panel1", L"Z", L"", z, 64, path.c_str());
+      if (count != (int)ref.panels.size() || wcstof(z, nullptr) != ref.panels[0].z) ++oldBad;
+      // New method
+      Config c;
+      if (!LoadConfig(path, c)) { ++newSkipped; continue; }
+      bool bad = c.panels.size() != ref.panels.size();
+      for (size_t k = 0; !bad && k < c.panels.size(); ++k)
+        bad = c.panels[k].x != ref.panels[k].x || c.panels[k].y != ref.panels[k].y || c.panels[k].z != ref.panels[k].z;
+      if (bad && newBad < 5) {
+        WIN32_FILE_ATTRIBUTE_DATA a{};
+        GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &a);
+        printf("  bad read: panels=%zu (expected %zu), file size now=%lu\n", c.panels.size(), ref.panels.size(),
+               a.nFileSizeLow);
+        for (size_t k = 0; k < c.panels.size() && k < ref.panels.size(); ++k)
+          printf("    [%s] got (%.3f %.3f %.3f) expected (%.3f %.3f %.3f)\n", Narrow(c.panels[k].section).c_str(),
+                 c.panels[k].x, c.panels[k].y, c.panels[k].z, ref.panels[k].x, ref.panels[k].y, ref.panels[k].z);
+      }
+      newBad += bad;
+    }
+    printf("reads=%d  old API wrong results=%d  new parser wrong results=%d (skipped safely: %d)\n", n, oldBad, newBad,
+           newSkipped);
+    return 0;
+  }
+
   if (argc >= 2 && std::wstring(argv[1]) == L"--config") {
-    Config cfg = LoadConfig(ConfigPath());
+    Config cfg;
+    if (!LoadConfig(ConfigPath(), cfg)) {
+      printf("FAIL: could not read %s\n", Narrow(ConfigPath()).c_str());
+      return 1;
+    }
     printf("%s: RecenterAll=%d, %zu panel(s)\n", Narrow(ConfigPath()).c_str(), cfg.recenterAllSeq,
            cfg.panels.size());
     for (auto& p : cfg.panels) {

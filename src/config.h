@@ -62,6 +62,8 @@ std::wstring ConfigPath();   // <DataDir>\config.ini
 std::wstring AnchorsPath();  // <DataDir>\anchors.ini
 void SaveAnchor(const std::wstring& section, const SavedAnchor& a);  // blocking file IO
 void EnsureDefaultConfig(const std::wstring& path);
-Config LoadConfig(const std::wstring& path);
+// Reads the whole file in one go (atomic snapshot). Returns false - leaving `out` untouched -
+// when the file can't be read right now (e.g. being replaced by the control app).
+bool LoadConfig(const std::wstring& path, Config& out);
 
 }  // namespace wp

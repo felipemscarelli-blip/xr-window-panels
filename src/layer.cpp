@@ -190,13 +190,16 @@ class ConfigWorker {
         if (haveAttr && CompareFileTime(&attr.ftLastWriteTime, &lastWrite) != 0) reload = true;
       }
       if (reload) {
-        if (haveAttr) lastWrite = attr.ftLastWriteTime;
-        Config c = LoadConfig(path);
-        Log("Config loaded: %zu panel(s)", c.panels.size());
-        std::lock_guard lock(m_mutex);
-        m_pending = std::move(c);
-        m_hasPending = true;
-        first = false;
+        Config c;
+        if (LoadConfig(path, c)) {
+          if (haveAttr) lastWrite = attr.ftLastWriteTime;
+          std::lock_guard lock(m_mutex);
+          m_pending = std::move(c);
+          m_hasPending = true;
+          first = false;
+        } else {
+          nextFileCheck = 0;  // file busy (being replaced): keep current config, retry in 50 ms
+        }
       }
 
       std::vector<std::pair<std::wstring, SavedAnchor>> anchors;

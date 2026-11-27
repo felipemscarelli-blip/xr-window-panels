@@ -71,8 +71,10 @@ namespace XRWindowPanels
 
         public ConfigFile()
         {
-            string dir = System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "XRWindowPanels");
+            // XRWP_DATA_DIR: optional override (tests / portable setups), same as the layer.
+            string dir = Environment.GetEnvironmentVariable("XRWP_DATA_DIR");
+            if (string.IsNullOrEmpty(dir))
+                dir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "XRWindowPanels");
             Directory.CreateDirectory(dir);
             Path = System.IO.Path.Combine(dir, "config.ini");
         }
@@ -727,7 +729,28 @@ namespace XRWindowPanels
             }
         }
 
+        // Coalesced save: the first change is written at once, then at most one write every 50 ms
+        // while changes keep coming (slider drags, held buttons); the last value is always written.
+        readonly System.Windows.Forms.Timer _saveTimer = new System.Windows.Forms.Timer { Interval = 50 };
+        bool _saveDirty, _saveTimerHooked;
+
         void Save()
+        {
+            if (!_saveTimerHooked)
+            {
+                _saveTimerHooked = true;
+                _saveTimer.Tick += delegate
+                {
+                    if (_saveDirty) { _saveDirty = false; SaveNow(); }
+                    else _saveTimer.Stop();
+                };
+            }
+            if (_saveTimer.Enabled) { _saveDirty = true; return; }
+            SaveNow();
+            _saveTimer.Start();
+        }
+
+        void SaveNow()
         {
             try
             {
@@ -829,6 +852,8 @@ namespace XRWindowPanels
 
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
+            if (_saveDirty) SaveNow();  // don't lose the last change
+            _saveTimer.Dispose();
             _link.Dispose();
             if (_poller != null) _poller.Dispose();
             if (_tray != null) { _tray.Visible = false; _tray.Dispose(); }
