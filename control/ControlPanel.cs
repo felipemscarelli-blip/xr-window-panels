@@ -443,7 +443,7 @@ namespace XRWindowPanels
             _poller.Fired += RunAction;
 
             // Minimize to tray so shortcuts keep working while racing
-            _tray = new NotifyIcon { Icon = AppIcon, Text = "XR Window Panels", Visible = true };
+            _tray = new NotifyIcon { Icon = AppIcon, Text = "XR Window Panels v" + AppVersion.Text, Visible = true };
             _tray.DoubleClick += delegate { RestoreFromTray(); };
             var menu = new ContextMenuStrip();
             menu.Items.Add(L.T("Open", "Abrir"), null, delegate { RestoreFromTray(); });
@@ -661,8 +661,12 @@ namespace XRWindowPanels
             _panelControls.AddRange(new Control[] { _opacity, _fps, _chroma, _color, _tolerance, _alpha });
 
             // Footer
-            _game = AddLabel(this, "", 12, 516, 556);
+            _game = AddLabel(this, "", 12, 516, 480);
             _game.Height = 20;
+            var version = AddLabel(this, "v" + AppVersion.Text, 496, 516, 76);
+            version.TextAlign = ContentAlignment.TopRight;
+            version.ForeColor = SystemColors.GrayText;
+            version.Height = 20;
             var autostart = Add(this, new CheckBox { Text = L.T("Start with Windows", "Iniciar com o Windows"), Checked = AutoStart.Enabled }, 580, 513, 168, 24);
             new ToolTip().SetToolTip(autostart, L.T("Opens the app minimized to the tray when you sign in to Windows, so shortcuts work right away.", "Abre o app minimizado na bandeja ao entrar no Windows, para os atalhos já funcionarem."));
             autostart.CheckedChanged += delegate

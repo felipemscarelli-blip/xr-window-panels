@@ -818,7 +818,7 @@ BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, LPVOID) {
     LogInit(L"layer.log");
     wchar_t exe[MAX_PATH] = {};
     GetModuleFileNameW(nullptr, exe, MAX_PATH);
-    Log("DLL loaded into %s", Narrow(exe).c_str());
+    Log("XR Window Panels v%s loaded into %s", XRWP_VERSION, Narrow(exe).c_str());
   }
   return TRUE;
 }
