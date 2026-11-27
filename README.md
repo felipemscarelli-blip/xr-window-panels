@@ -51,7 +51,7 @@ No app de controle, clique em **⌨ Atalhos...** e dê um duplo clique numa aç�
   - Ativar/desativar painel
   - Mover ▲◀▶▼, Maior/Menor, Mais perto/longe, Inclinar/girar. Esses movimentos repetem enquanto o botão estiver pressionado.
 - **Qual painel se move**: as ações de movimento valem para o painel selecionado. Ao trocar de painel, ele ganha uma **borda amarela por 1,5 s no VR**, para você saber qual está selecionado.
-- **Controles**: volantes e controles são lidos pelo Windows (WinMM), com os botões 1 a 32 e o direcional (POV/hat) de cada dispositivo.
+- **Controles**: volantes, button boxes e joysticks são lidos via Raw Input (HID), sem limite de botões (bases Simagic, por exemplo, expõem mais de 100), incluindo o direcional (POV/hat). A janela de captura mostra ao vivo o que cada controle está enviando.
 - **App aberto**: os atalhos funcionam com o jogo em foco, desde que o app esteja aberto. Minimizado, ele vai para a bandeja e continua funcionando.
 - **Onde ficam salvos**: `%LOCALAPPDATA%\XRWindowPanels\bindings.ini`.
 
