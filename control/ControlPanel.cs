@@ -363,6 +363,22 @@ namespace XRWindowPanels
 
         PanelData Current { get { return _list.SelectedItem as PanelData; } }
 
+        // Icon embedded in the exe (assets/icon.ico via csc /win32icon).
+        static Icon _appIcon;
+        static Icon AppIcon
+        {
+            get
+            {
+                if (_appIcon == null)
+                {
+                    try { _appIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); }
+                    catch (Exception) { }
+                    if (_appIcon == null) _appIcon = SystemIcons.Application;
+                }
+                return _appIcon;
+            }
+        }
+
         float StepScale
         {
             get { return _step.SelectedIndex == 0 ? 0.25f : (_step.SelectedIndex == 2 ? 4f : 1f); }
@@ -371,6 +387,7 @@ namespace XRWindowPanels
         public MainForm()
         {
             Text = "XR Window Panels";
+            Icon = AppIcon;
             Font = new Font("Segoe UI", 9f);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(760, 545);
@@ -390,7 +407,7 @@ namespace XRWindowPanels
             _poller.Fired += RunAction;
 
             // Minimize to tray so shortcuts keep working while racing
-            _tray = new NotifyIcon { Icon = SystemIcons.Application, Text = "XR Window Panels", Visible = true };
+            _tray = new NotifyIcon { Icon = AppIcon, Text = "XR Window Panels", Visible = true };
             _tray.DoubleClick += delegate { RestoreFromTray(); };
             var menu = new ContextMenuStrip();
             menu.Items.Add("Abrir", null, delegate { RestoreFromTray(); });

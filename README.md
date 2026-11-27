@@ -1,3 +1,5 @@
+<img src="assets/icon-256.png" alt="XR Window Panels" width="96" align="right">
+
 # XR Window Panels
 
 Camada (API layer) OpenXR que mostra janelas do Windows como painéis dentro de apps e jogos VR em Direct3D 11 (iRacing, ACC, LMU, AMS2, DesktopXR...). Feita para levar overlays de telemetria e coaching para dentro do VR, como as linhas de acelerador e freio de uma volta de referência.

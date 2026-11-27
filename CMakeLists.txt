@@ -48,6 +48,7 @@ add_custom_target(control_app ALL
   COMMAND "${CSC}" /nologo /codepage:65001 /target:winexe /optimize+
           "/out:$<TARGET_FILE_DIR:XRWindowPanels>/XRWindowPanelsControl.exe"
           /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Core.dll
+          /win32icon:assets\\icon.ico
           control\\ControlPanel.cs control\\Input.cs
   WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
   DEPENDS XRWindowPanels
