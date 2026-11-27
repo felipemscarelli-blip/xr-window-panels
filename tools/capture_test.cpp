@@ -85,6 +85,8 @@ int wmain(int argc, wchar_t** argv) {
       bp.keyColor[0] = ((rgb >> 16) & 0xFF) / 255.0f;
       bp.keyColor[1] = ((rgb >> 8) & 0xFF) / 255.0f;
       bp.keyColor[2] = (rgb & 0xFF) / 255.0f;
+    } else if (a == L"--border" && i + 1 < argc) {
+      bp.borderPx = _wtoi(argv[++i]);
     } else {
       out = a;
     }

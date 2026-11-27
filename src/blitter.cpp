@@ -16,6 +16,7 @@ SamplerState smp : register(s0);
 cbuffer Params : register(b0) {
   float3 keyColor; float keyTolerance;
   float opacity; float chromaKey; float srgbTarget; float useSourceAlpha;
+  float2 border; float2 pad;  // border thickness in UV units (0 = none)
 };
 struct VSOut { float4 pos : SV_Position; float2 uv : TEXCOORD0; };
 
@@ -31,6 +32,9 @@ float3 ToLinear(float3 c) {
 }
 
 float4 PSMain(VSOut i) : SV_Target {
+  if (border.x > 0 && (any(i.uv < border) || any(i.uv > 1 - border))) {
+    return float4(1.0, 0.75, 0.0, 1.0);  // highlight (amber), opaque
+  }
   float4 c = src.Sample(smp, i.uv);
   float a = opacity;
   if (useSourceAlpha > 0.5) a *= c.a;
@@ -50,6 +54,8 @@ struct alignas(16) CBData {
   float chromaKey;
   float srgbTarget;
   float useSourceAlpha;
+  float border[2];
+  float pad[2];
 };
 
 static ComPtr<ID3DBlob> Compile(const char* entry, const char* target) {
@@ -102,6 +108,10 @@ void Blitter::Draw(ID3D11DeviceContext* ctx, ID3D11ShaderResourceView* src,
   cb.chromaKey = p.chromaKey ? 1.0f : 0.0f;
   cb.srgbTarget = p.srgbTarget ? 1.0f : 0.0f;
   cb.useSourceAlpha = p.useSourceAlpha ? 1.0f : 0.0f;
+  if (p.borderPx > 0 && width > 0 && height > 0) {
+    cb.border[0] = (float)p.borderPx / (float)width;
+    cb.border[1] = (float)p.borderPx / (float)height;
+  }
   ctx->UpdateSubresource(m_cb.Get(), 0, nullptr, &cb, 0, 0);
 
   D3D11_VIEWPORT vp{0, 0, (float)width, (float)height, 0, 1};

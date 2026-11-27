@@ -219,6 +219,7 @@ struct Panel {
   bool needsRedraw = false;     // look changed: re-render from the last capture
   bool renderPending = false;   // new content waiting to be drawn
   bool pendingRecenter = false;
+  int64_t highlightUntil = 0;   // QPC time; border shown while selected via the control app
   XrPosef anchor{{0, 0, 0, 1}, {0, 0, 0}};
 };
 
@@ -236,6 +237,8 @@ struct SessionState {
 
   bool configLoaded = false;
   int recenterAllSeq = 0;
+  int toggleAllSeq = 0;
+  int selectSeq = 0;
   std::vector<std::unique_ptr<Panel>> panels;
   std::vector<XrCompositionLayerQuad> quads;
   std::vector<const XrCompositionLayerBaseHeader*> layers;  // reused every frame
@@ -330,6 +333,7 @@ static bool RenderPanel(SessionState& s, Panel& p) {
       memcpy(bp.keyColor, p.cfg.keyColor, sizeof(bp.keyColor));
       bp.keyTolerance = p.cfg.keyTolerance;
       bp.srgbTarget = s.srgbFormat;
+      if (p.highlightUntil != 0) bp.borderPx = std::max(4u, std::min(p.scWidth, p.scHeight) / 60);
       s.blitter.Draw(s.ctx.Get(), p.srv.Get(), p.rtvs[index].Get(), p.scWidth, p.scHeight, bp);
       drawn = true;
     }
@@ -348,6 +352,13 @@ static void ApplyConfig(SessionState& s, const Config& cfg) {
   const bool firstLoad = !s.configLoaded;
   const bool recenterAll = !firstLoad && cfg.recenterAllSeq != s.recenterAllSeq;
   s.recenterAllSeq = cfg.recenterAllSeq;
+  if (!firstLoad && cfg.toggleAllSeq != s.toggleAllSeq) {
+    s.visible = !s.visible;
+    Log("Panels %s (control app)", s.visible ? "shown" : "hidden");
+  }
+  s.toggleAllSeq = cfg.toggleAllSeq;
+  const bool highlight = !firstLoad && cfg.selectSeq != s.selectSeq;
+  s.selectSeq = cfg.selectSeq;
   s.configLoaded = true;
 
   std::vector<std::unique_ptr<Panel>> old = std::move(s.panels);
@@ -378,6 +389,11 @@ static void ApplyConfig(SessionState& s, const Config& cfg) {
                                                        pc.maxFps);
     }
     if (panel->capture) panel->capture->SetMaxFps(pc.maxFps);
+    if (highlight) {
+      const bool selected = pc.section == cfg.selected;
+      if (selected || panel->highlightUntil != 0) panel->needsRedraw = true;
+      panel->highlightUntil = selected ? QpcNow() + QpcFreq() * 3 / 2 : 0;  // 1.5 s
+    }
     s.panels.push_back(std::move(panel));
   }
   for (auto& o : old) {
@@ -468,6 +484,13 @@ static void UpdateSession(SessionState& s, XrTime displayTime) {
     WriteStatus(s);
   }
   if (!s.visible) return;  // hidden: no capture or GPU work at all
+
+  for (auto& pp : s.panels) {  // end of the selection highlight: redraw without border
+    if (pp->highlightUntil != 0 && now >= pp->highlightUntil) {
+      pp->highlightUntil = 0;
+      pp->needsRedraw = true;
+    }
+  }
 
   bool anyRender = false;
   for (auto& pp : s.panels) {

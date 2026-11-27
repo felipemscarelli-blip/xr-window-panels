@@ -11,6 +11,7 @@ struct BlitParams {
   float keyColor[3] = {0, 0, 0};
   float keyTolerance = 0.1f;
   bool srgbTarget = false;  // target is an *_SRGB format: convert to linear in the shader
+  int borderPx = 0;         // >0 draws a highlight border of this many pixels
 };
 
 // Draws a texture into a render target with opacity / chroma key, writing

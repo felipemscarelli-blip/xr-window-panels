@@ -35,8 +35,25 @@ As mudanças aparecem no VR na hora. Ficam salvas em `%LOCALAPPDATA%\XRWindowPan
 
 ## Atalhos no jogo
 
+Atalhos fixos da camada (funcionam mesmo sem o app aberto):
+
 - `Ctrl+F12`: mostra/esconde os painéis. Escondidos, eles não gastam nada de GPU.
 - `Ctrl+F11`: recentraliza todos os painéis na frente da cabeça.
+
+### Atalhos personalizados: teclado, volante e button box
+
+No app de controle, clique em **⌨ Atalhos...** e dê um duplo clique numa ação. Depois aperte a tecla (pode combinar com Ctrl, Shift ou Alt) ou o botão do volante, da button box ou do joystick.
+
+- **Ações disponíveis**:
+  - Recentralizar (selecionado / todos)
+  - Mostrar/esconder todos
+  - Próximo/anterior painel
+  - Ativar/desativar painel
+  - Mover ▲◀▶▼, Maior/Menor, Mais perto/longe, Inclinar/girar. Esses movimentos repetem enquanto o botão estiver pressionado.
+- **Qual painel se move**: as ações de movimento valem para o painel selecionado. Ao trocar de painel, ele ganha uma **borda amarela por 1,5 s no VR**, para você saber qual está selecionado.
+- **Controles**: volantes e controles são lidos pelo Windows (WinMM), com os botões 1 a 32 e o direcional (POV/hat) de cada dispositivo.
+- **App aberto**: os atalhos funcionam com o jogo em foco, desde que o app esteja aberto. Minimizado, ele vai para a bandeja e continua funcionando.
+- **Onde ficam salvos**: `%LOCALAPPDATA%\XRWindowPanels\bindings.ini`.
 
 ## Desempenho
 

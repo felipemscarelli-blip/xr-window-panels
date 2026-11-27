@@ -39,7 +39,11 @@ struct PanelConfig {
 
 struct Config {
   std::vector<PanelConfig> panels;
-  int recenterAllSeq = 0;  // [Control] RecenterAll
+  // [Control] section: commands from the control app (counters: a change triggers the action)
+  int recenterAllSeq = 0;  // RecenterAll: recenter every panel
+  int toggleAllSeq = 0;    // ToggleAll: show/hide all panels
+  int selectSeq = 0;       // SelectSeq + Selected: briefly highlight the selected panel
+  std::wstring selected;
 };
 
 std::wstring ConfigPath();  // <DataDir>\config.ini

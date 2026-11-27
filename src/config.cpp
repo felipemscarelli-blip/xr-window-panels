@@ -81,6 +81,9 @@ static bool ReadBool(const std::wstring& file, const wchar_t* sec, const wchar_t
 Config LoadConfig(const std::wstring& path) {
   Config cfg;
   cfg.recenterAllSeq = GetPrivateProfileIntW(L"Control", L"RecenterAll", 0, path.c_str());
+  cfg.toggleAllSeq = GetPrivateProfileIntW(L"Control", L"ToggleAll", 0, path.c_str());
+  cfg.selectSeq = GetPrivateProfileIntW(L"Control", L"SelectSeq", 0, path.c_str());
+  cfg.selected = ReadStr(path, L"Control", L"Selected");
 
   std::wstring names(32768, L'\0');
   DWORD n = GetPrivateProfileSectionNamesW(names.data(), (DWORD)names.size(), path.c_str());

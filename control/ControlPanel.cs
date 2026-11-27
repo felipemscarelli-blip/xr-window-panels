@@ -65,7 +65,8 @@ namespace XRWindowPanels
     {
         public readonly string Path;
         public readonly List<PanelData> Panels = new List<PanelData>();
-        public int RecenterAll;
+        public int RecenterAll, ToggleAll, SelectSeq;
+        public string Selected;  // section highlighted in VR after SelectSeq changes
 
         public ConfigFile()
         {
@@ -105,6 +106,8 @@ namespace XRWindowPanels
             Panels.Clear();
             if (!File.Exists(Path)) return;
             RecenterAll = ReadI("Control", "RecenterAll", 0);
+            ToggleAll = ReadI("Control", "ToggleAll", 0);
+            SelectSeq = ReadI("Control", "SelectSeq", 0);
             var buf = new char[32768];
             int n = Native.GetPrivateProfileSectionNames(buf, buf.Length, Path);
             foreach (string sec in new string(buf, 0, n).Split(new[] { '\0' }, StringSplitOptions.RemoveEmptyEntries))
@@ -139,6 +142,9 @@ namespace XRWindowPanels
             sb.AppendLine();
             sb.AppendLine("[Control]");
             sb.AppendLine("RecenterAll=" + RecenterAll);
+            sb.AppendLine("ToggleAll=" + ToggleAll);
+            sb.AppendLine("SelectSeq=" + SelectSeq);
+            sb.AppendLine("Selected=" + (Selected ?? ""));
             foreach (var p in Panels)
             {
                 sb.AppendLine();
@@ -349,6 +355,11 @@ namespace XRWindowPanels
         NumericUpDown _fps;
         Button _color;
         readonly List<Control> _panelControls = new List<Control>();
+        readonly Dictionary<string, Action<PanelData, float>> _moves = new Dictionary<string, Action<PanelData, float>>();
+        BindingStore _bindings;
+        InputPoller _poller;
+        NotifyIcon _tray;
+        bool _trayHintShown;
 
         PanelData Current { get { return _list.SelectedItem as PanelData; } }
 
@@ -372,6 +383,30 @@ namespace XRWindowPanels
             RefreshPanelList(null);
             RefreshWindows();
 
+            // Keyboard / wheel shortcuts
+            _bindings = new BindingStore(System.IO.Path.GetDirectoryName(_cfg.Path));
+            _bindings.Load();
+            _poller = new InputPoller(_bindings);
+            _poller.Fired += RunAction;
+
+            // Minimize to tray so shortcuts keep working while racing
+            _tray = new NotifyIcon { Icon = SystemIcons.Application, Text = "XR Window Panels", Visible = true };
+            _tray.DoubleClick += delegate { RestoreFromTray(); };
+            var menu = new ContextMenuStrip();
+            menu.Items.Add("Abrir", null, delegate { RestoreFromTray(); });
+            menu.Items.Add("Sair", null, delegate { Close(); });
+            _tray.ContextMenuStrip = menu;
+            Resize += delegate
+            {
+                if (WindowState != FormWindowState.Minimized) return;
+                Hide();
+                if (!_trayHintShown)
+                {
+                    _tray.ShowBalloonTip(3000, "XR Window Panels", "Continua rodando na bandeja: os atalhos seguem funcionando.", ToolTipIcon.Info);
+                    _trayHintShown = true;
+                }
+            };
+
             var timer = new System.Windows.Forms.Timer { Interval = 500 };
             timer.Tick += delegate { UpdateStatus(); };
             timer.Start();
@@ -389,19 +424,75 @@ namespace XRWindowPanels
         {
             return Add(parent, new Label { Text = text, AutoSize = false }, x, y, w, 18);
         }
-        RepeatButton AddStep(Control parent, string text, int x, int y, int w, Action<PanelData, float> apply)
+        RepeatButton AddStep(Control parent, string id, string text, int x, int y, int w, Action<PanelData, float> apply)
         {
             var b = Add(parent, new RepeatButton { Text = text }, x, y, w, 30);
             if (text.Length == 1) b.Font = new Font("Segoe UI Symbol", 12f);  // arrow glyphs
-            b.Step += delegate
+            _moves[id] = apply;  // also reachable from shortcuts
+            b.Step += delegate { RunAction(id); };
+            _panelControls.Add(b);
+            return b;
+        }
+
+        // Runs an action from a button or a keyboard/wheel shortcut.
+        void RunAction(string id)
+        {
+            Action<PanelData, float> move;
+            if (_moves.TryGetValue(id, out move))
             {
                 var p = Current;
                 if (p == null) return;
-                apply(p, StepScale);
+                move(p, StepScale);
                 Commit(p);
-            };
-            _panelControls.Add(b);
-            return b;
+                return;
+            }
+            switch (id)
+            {
+                case "recenter": Edit(delegate (PanelData p) { p.RecenterSeq++; }); break;
+                case "recenterAll": _cfg.RecenterAll++; Save(); break;
+                case "toggleAll": _cfg.ToggleAll++; Save(); break;
+                case "togglePanel":
+                    if (Current != null) { _enabled.Checked = !_enabled.Checked; }
+                    break;
+                case "nextPanel":
+                case "prevPanel":
+                    int n = _list.Items.Count;
+                    if (n == 0) break;
+                    int i = _list.SelectedIndex < 0 ? 0 : _list.SelectedIndex;
+                    _list.SelectedIndex = (i + (id == "nextPanel" ? 1 : n - 1)) % n;  // highlights in VR
+                    break;
+            }
+        }
+
+        // Briefly outline the selected panel in VR so you know which one the controls move.
+        void HighlightSelected()
+        {
+            var p = Current;
+            if (p == null) return;
+            _cfg.Selected = p.Section;
+            _cfg.SelectSeq++;
+            Save();
+        }
+
+        void RestoreFromTray()
+        {
+            Show();
+            WindowState = FormWindowState.Normal;
+            Activate();
+        }
+
+        void OpenBindings()
+        {
+            _poller.Paused = true;
+            try
+            {
+                using (var dlg = new BindingsForm(_bindings)) dlg.ShowDialog(this);
+            }
+            finally
+            {
+                _poller.Reset();
+                _poller.Paused = false;
+            }
         }
 
         void BuildUi()
@@ -409,11 +500,18 @@ namespace XRWindowPanels
             // Panel list
             AddLabel(this, "Painéis", 12, 10, 170);
             _list = Add(this, new ListBox { IntegralHeight = false }, 12, 30, 172, 410);
-            _list.SelectedIndexChanged += delegate { ShowPanel(); };
+            _list.SelectedIndexChanged += delegate
+            {
+                if (_loading) return;
+                ShowPanel();
+                HighlightSelected();
+            };
             var addBtn = Add(this, new Button { Text = "+ Adicionar" }, 12, 446, 84, 28);
             addBtn.Click += delegate { AddPanel(); };
             var delBtn = Add(this, new Button { Text = "Remover" }, 100, 446, 84, 28);
             delBtn.Click += delegate { RemovePanel(); };
+            var keysBtn = Add(this, new Button { Text = "⌨  Atalhos..." }, 12, 480, 172, 28);
+            keysBtn.Click += delegate { OpenBindings(); };
 
             // Window
             var gWin = Add(this, new GroupBox { Text = "Janela" }, 196, 6, 552, 124);
@@ -438,10 +536,10 @@ namespace XRWindowPanels
             // Position
             var gPos = Add(this, new GroupBox { Text = "Posição (segure o botão para repetir)" }, 196, 134, 552, 236);
             var recenter = Add(gPos, new Button { Text = "Recentralizar" }, 12, 22, 120, 30);
-            recenter.Click += delegate { Edit(delegate (PanelData p) { p.RecenterSeq++; }); };
+            recenter.Click += delegate { RunAction("recenter"); };
             _panelControls.Add(recenter);
             var recenterAll = Add(gPos, new Button { Text = "Recentralizar todos" }, 138, 22, 140, 30);
-            recenterAll.Click += delegate { _cfg.RecenterAll++; Save(); };
+            recenterAll.Click += delegate { RunAction("recenterAll"); };
             var reset = Add(gPos, new Button { Text = "Posição padrão" }, 284, 22, 115, 30);
             reset.Click += delegate { Edit(delegate (PanelData p) { p.X = 0; p.Y = -0.15f; p.Z = -0.7f; p.Yaw = 0; p.Pitch = 0; }); };
             _panelControls.Add(reset);
@@ -452,24 +550,24 @@ namespace XRWindowPanels
 
             const float move = 0.01f, size = 0.01f, dist = 0.02f, tilt = 2f;
             AddLabel(gPos, "Mover", 12, 62, 120);
-            AddStep(gPos, "▲", 52, 82, 40, delegate (PanelData p, float k) { p.Y += move * k; });
-            AddStep(gPos, "◀", 10, 114, 40, delegate (PanelData p, float k) { p.X -= move * k; });
-            AddStep(gPos, "▶", 94, 114, 40, delegate (PanelData p, float k) { p.X += move * k; });
-            AddStep(gPos, "▼", 52, 146, 40, delegate (PanelData p, float k) { p.Y -= move * k; });
+            AddStep(gPos, "up", "▲", 52, 82, 40, delegate (PanelData p, float k) { p.Y += move * k; });
+            AddStep(gPos, "left", "◀", 10, 114, 40, delegate (PanelData p, float k) { p.X -= move * k; });
+            AddStep(gPos, "right", "▶", 94, 114, 40, delegate (PanelData p, float k) { p.X += move * k; });
+            AddStep(gPos, "down", "▼", 52, 146, 40, delegate (PanelData p, float k) { p.Y -= move * k; });
 
             AddLabel(gPos, "Tamanho", 160, 62, 100);
-            AddStep(gPos, "Maior", 160, 82, 95, delegate (PanelData p, float k) { p.Width += size * k; });
-            AddStep(gPos, "Menor", 160, 116, 95, delegate (PanelData p, float k) { p.Width = Math.Max(0.05f, p.Width - size * k); });
+            AddStep(gPos, "bigger", "Maior", 160, 82, 95, delegate (PanelData p, float k) { p.Width += size * k; });
+            AddStep(gPos, "smaller", "Menor", 160, 116, 95, delegate (PanelData p, float k) { p.Width = Math.Max(0.05f, p.Width - size * k); });
 
             AddLabel(gPos, "Distância", 270, 62, 100);
-            AddStep(gPos, "Mais perto", 270, 82, 95, delegate (PanelData p, float k) { p.Z = Math.Min(-0.1f, p.Z + dist * k); });
-            AddStep(gPos, "Mais longe", 270, 116, 95, delegate (PanelData p, float k) { p.Z -= dist * k; });
+            AddStep(gPos, "nearer", "Mais perto", 270, 82, 95, delegate (PanelData p, float k) { p.Z = Math.Min(-0.1f, p.Z + dist * k); });
+            AddStep(gPos, "further", "Mais longe", 270, 116, 95, delegate (PanelData p, float k) { p.Z -= dist * k; });
 
             AddLabel(gPos, "Inclinar / girar", 386, 62, 150);
-            AddStep(gPos, "▲", 428, 82, 40, delegate (PanelData p, float k) { p.Pitch -= tilt * k; });
-            AddStep(gPos, "◀", 386, 114, 40, delegate (PanelData p, float k) { p.Yaw -= tilt * k; });
-            AddStep(gPos, "▶", 470, 114, 40, delegate (PanelData p, float k) { p.Yaw += tilt * k; });
-            AddStep(gPos, "▼", 428, 146, 40, delegate (PanelData p, float k) { p.Pitch += tilt * k; });
+            AddStep(gPos, "tiltUp", "▲", 428, 82, 40, delegate (PanelData p, float k) { p.Pitch -= tilt * k; });
+            AddStep(gPos, "turnLeft", "◀", 386, 114, 40, delegate (PanelData p, float k) { p.Yaw -= tilt * k; });
+            AddStep(gPos, "turnRight", "▶", 470, 114, 40, delegate (PanelData p, float k) { p.Yaw += tilt * k; });
+            AddStep(gPos, "tiltDown", "▼", 428, 146, 40, delegate (PanelData p, float k) { p.Pitch += tilt * k; });
 
             _pose = AddLabel(gPos, "", 12, 196, 528);
             _pose.ForeColor = SystemColors.GrayText;
@@ -487,8 +585,7 @@ namespace XRWindowPanels
             AddLabel(gLook, "Atualizações/s", 312, 28, 95);
             _fps = Add(gLook, new NumericUpDown { Minimum = 5, Maximum = 90, Increment = 5 }, 410, 25, 60, 24);
             _fps.ValueChanged += delegate { Edit(delegate (PanelData p) { p.MaxFps = (int)_fps.Value; }); };
-            var fpsHint = AddLabel(gLook, "menos = leve", 474, 28, 76);
-            fpsHint.ForeColor = SystemColors.GrayText;
+            new ToolTip().SetToolTip(_fps, "Quantas vezes por segundo a imagem do painel é atualizada. Menos = mais leve para o jogo.");
 
             _chroma = Add(gLook, new CheckBox { Text = "Remover cor de fundo" }, 12, 66, 150, 22);
             _chroma.CheckedChanged += delegate { Edit(delegate (PanelData p) { p.ChromaKey = _chroma.Checked; }); };
@@ -512,9 +609,9 @@ namespace XRWindowPanels
             _loading = true;
             _list.Items.Clear();
             foreach (var p in _cfg.Panels) _list.Items.Add(p);
-            _loading = false;
             if (select != null) _list.SelectedItem = select;
             else if (_list.Items.Count > 0) _list.SelectedIndex = 0;
+            _loading = false;
             ShowPanel();
         }
 
@@ -676,6 +773,8 @@ namespace XRWindowPanels
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
             _link.Dispose();
+            if (_poller != null) _poller.Dispose();
+            if (_tray != null) { _tray.Visible = false; _tray.Dispose(); }
             base.OnFormClosed(e);
         }
     }
